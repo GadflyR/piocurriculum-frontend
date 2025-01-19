@@ -10,6 +10,5 @@ module.exports = {
     moduleNameMapper: {
       '\\.(css|less)$': 'identity-obj-proxy', // Mock CSS imports
     },
-    setupFilesAfterEnv: ['<rootDir>/src/setupTests.js'],
   };
   

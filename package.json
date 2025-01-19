@@ -51,10 +51,7 @@
     ],
     "moduleNameMapper": {
       "\\.(css|less)$": "identity-obj-proxy"
-    },
-    "setupFilesAfterEnv": [
-      "<rootDir>/src/setupTests.js"
-    ]
+    }
   },
   "devDependencies": {
     "@babel/core": "^7.26.0",

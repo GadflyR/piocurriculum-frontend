@@ -42,7 +42,6 @@
     ]
   },
   "jest": {
-    "preset": "react-app",
     "transform": {
       "^.+\\.[jt]sx?$": "babel-jest"
     },

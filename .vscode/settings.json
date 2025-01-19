@@ -1,0 +1,8 @@
+{
+    "appService.zipIgnorePattern": [
+        "node_modules{,/**}",
+        ".vscode{,/**}"
+    ],
+    "appService.defaultWebAppToDeploy": "/subscriptions/d649b87e-8a6e-4b5e-b243-8758b8cd25d2/resourceGroups/PioCurriculum-frontend_group/providers/Microsoft.Web/sites/PioCurriculum-frontend",
+    "appService.deploySubpath": "."
+}

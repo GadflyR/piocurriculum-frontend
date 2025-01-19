@@ -1,7 +1,6 @@
 {
   "name": "piocurriculum-frontend",
   "version": "0.1.0",
-  "type": "module",
   "private": true,
   "dependencies": {
     "body-parser": "^1.20.3",

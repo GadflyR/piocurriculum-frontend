@@ -1,23 +1,22 @@
 /* eslint-disable no-case-declarations */
 
-import express from "express";
-import cors from "cors";
-import bodyParser from "body-parser";
-import path from "path";
-import { fileURLToPath } from "url";
-
+const cors = require('cors');
+const bodyParser = require('body-parser');
+const fileURLToPath = require('url');
+const express = require('express');
+const path = require('path');
+const app = express();
 // If using ESM, replicate __dirname
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+// const __filename = fileURLToPath(import.meta.url);
+// const __dirname = path.dirname(__filename);
 
 const PORT = process.env.PORT || 8080;
-const app = express();
 app.use(cors());
 app.use(bodyParser.json());
 
-app.use(express.static(path.join(__dirname, 'build')));
+app.use(express.static(path.join(__dirname, '../build')));
 app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'build', 'index.html'));
+  res.sendFile(path.join(__dirname, '../build', 'index.html'));
 });
 
 // ===================== 1) STATIC CONSTANTS (like Java) =====================

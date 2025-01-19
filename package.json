@@ -42,6 +42,21 @@
       "last 1 safari version"
     ]
   },
+  "jest": {
+    "preset": "react-app",
+    "transform": {
+      "^.+\\.[jt]sx?$": "babel-jest"
+    },
+    "transformIgnorePatterns": [
+      "/node_modules/(?!(axios)/)"
+    ],
+    "moduleNameMapper": {
+      "\\.(css|less)$": "identity-obj-proxy"
+    },
+    "setupFilesAfterEnv": [
+      "<rootDir>/src/setupTests.js"
+    ]
+  },
   "devDependencies": {
     "@babel/core": "^7.26.0",
     "@babel/plugin-proposal-private-property-in-object": "^7.21.11",
@@ -50,6 +65,7 @@
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.2.0",
     "axios": "^1.7.9",
-    "babel-jest": "^29.7.0"
+    "babel-jest": "^29.7.0",
+    "identity-obj-proxy": "^3.0.0"
   }
 }

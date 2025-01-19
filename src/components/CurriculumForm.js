@@ -2,8 +2,8 @@
 
 import React, { useState, useEffect } from "react";
 import { Accordion, Form, Row, Col, Button, ProgressBar } from "react-bootstrap";
-import { generatePlan } from "../services/curriculumService";
-import { ALL_COURSES, groupCoursesBySubject } from "../utils/courseSubjectUtil";
+import { generatePlan } from "../services/curriculumService.js";
+import { ALL_COURSES, groupCoursesBySubject } from "../utils/courseSubjectUtil.js";
 
 // For major direction
 const MAJOR_DIRECTIONS = [

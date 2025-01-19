@@ -107,7 +107,7 @@ export const coursesByLevel = {
    * Simple function to guess the subject from a course name.
    * Customize as needed!
    */
-  function getSubject(course) {
+  export function getSubject(course) {
     const lower = course.toLowerCase();
   
     if (lower.includes("english") || lower.includes("literature") || lower.includes("writing")) {
@@ -137,10 +137,7 @@ export const coursesByLevel = {
   
     return "Other";
   }
-  
-  /**
-   * Group all courses by subject.
-   */
+
   export function groupCoursesBySubject(courses) {
     const grouped = {};
     for (const c of courses) {

@@ -6,7 +6,7 @@ import axios from "axios";
 const API_URL = 
   process.env.NODE_ENV === "production"
     ? "/api/curriculum" // if served from same domain
-    : "http://localhost:5000/api/curriculum";
+    : "https://piocurriculum-frontend-drf3ehh5fegqhmfg.eastus2-01.azurewebsites.net/api/curriculum";
 
 export const generatePlan = async (payload) => {
   const response = await axios.post(`${API_URL}/plan`, payload);

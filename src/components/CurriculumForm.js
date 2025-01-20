@@ -1,7 +1,7 @@
 // src/components/CurriculumForm.js
 
 import React, { useState, useEffect } from "react";
-import { Accordion, Form, Row, Col, Button, ProgressBar } from "react-bootstrap";
+import { Accordion, Form, Row, Col, Button, ProgressBar, Card } from "react-bootstrap";
 import { generatePlan } from "../services/curriculumService.js";
 import { ALL_COURSES, groupCoursesBySubject } from "../utils/courseSubjectUtil.js";
 
@@ -29,18 +29,24 @@ const SUBJECT_ORDER = [
   "Other",
 ];
 
+// Example color map for each period. Feel free to expand if you have more periods.
+const PERIOD_COLORS = {
+  1: "#ffe0e0", // light red-ish
+  2: "#ffecc2", // light orange
+  3: "#fff7b3", // light yellow
+  4: "#d8f7d8", // light green
+  5: "#d5f2ff", // light blue
+  6: "#e7d5ff", // light purple
+  7: "#f9d5ff", // pink/purple
+  8: "#ffd5f5", // pink
+};
+
 const CurriculumForm = () => {
   const [grade, setGrade] = useState(9);
   const [majorDirection, setMajorDirection] = useState(1);
   const [completedCourses, setCompletedCourses] = useState([]);
-
-  // For the progress bar
   const [isLoading, setIsLoading] = useState(false);
-
-  // Result from the backend
   const [result, setResult] = useState(null);
-
-  // Group all courses by subject
   const [coursesBySubject, setCoursesBySubject] = useState({});
 
   useEffect(() => {
@@ -61,7 +67,7 @@ const CurriculumForm = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setIsLoading(true); // start progress
+    setIsLoading(true);
     setResult(null);
 
     try {
@@ -74,15 +80,18 @@ const CurriculumForm = () => {
       setResult(data);
     } catch (error) {
       console.error("Error generating plan:", error);
-      // Optionally show an error message
     } finally {
-      setIsLoading(false); // end progress
+      setIsLoading(false);
     }
   };
 
-  return (
-    <div className="container mt-4">
+  // Helper to get the background color for each period
+  const getPeriodColor = (period) => {
+    return PERIOD_COLORS[period] || "#f0f0f0"; // fallback color
+  };
 
+  return (
+    <div className="container mt-4" style={{ fontSize: "1.1rem" }}>
       {/* Title */}
       <h2 className="mb-3">Curriculum Planner</h2>
 
@@ -167,24 +176,41 @@ const CurriculumForm = () => {
 
       {/* Results */}
       {result && !isLoading && (
-        <div className="mt-5">
+        <div className="mt-5" style={{ fontSize: "1.1rem" }}>
           <h3>Results</h3>
 
           {/* Highest GPA Plans */}
-          <div>
+          <div className="mb-4">
             <h4>Highest GPA Plans</h4>
             {result.highestGpaPlans && result.highestGpaPlans.length > 0 ? (
               result.highestGpaPlans.map((plan, idx) => (
-                <div key={idx} style={{ marginBottom: "1rem" }}>
-                  <strong>Math & English combo:</strong> {plan.mathEnglishCombo}
-                  <ul>
+                <Card
+                  key={idx}
+                  className="mb-3"
+                  style={{ border: "1px solid #ccc" }}
+                >
+                  <Card.Header
+                    style={{ backgroundColor: "#e0ffe0", fontWeight: "bold" }}
+                  >
+                    Math &amp; English combo: {plan.mathEnglishCombo}
+                  </Card.Header>
+                  <Card.Body>
                     {plan.periods.map((p) => (
-                      <li key={p.period}>
-                        <b>Period {p.period}:</b> {p.courseNames.join(", ")}
-                      </li>
+                      <div
+                        key={p.period}
+                        style={{
+                          backgroundColor: getPeriodColor(p.period),
+                          margin: "0.5rem 0",
+                          padding: "0.5rem",
+                          borderRadius: "4px",
+                        }}
+                      >
+                        <strong>Period {p.period}:</strong>{" "}
+                        {p.courseNames.join(", ")}
+                      </div>
                     ))}
-                  </ul>
-                </div>
+                  </Card.Body>
+                </Card>
               ))
             ) : (
               <p>No highest GPA plan found.</p>
@@ -192,37 +218,69 @@ const CurriculumForm = () => {
           </div>
 
           {/* Most Relevant Plan */}
-          <div>
+          <div className="mb-4">
             <h4>Most Relevant Plan (by period)</h4>
             {result.mostRelevantPlan && result.mostRelevantPlan.length > 0 ? (
-              <ul>
-                {result.mostRelevantPlan.map((p, idx) => (
-                  <li key={idx}>
-                    <b>Period {p.period}:</b> {p.courseNames.join(", ")}
-                  </li>
-                ))}
-              </ul>
+              <Card className="mb-3" style={{ border: "1px solid #ccc" }}>
+                <Card.Header
+                  style={{ backgroundColor: "#e0f7ff", fontWeight: "bold" }}
+                >
+                  Most Relevant Courses
+                </Card.Header>
+                <Card.Body>
+                  {result.mostRelevantPlan.map((p, idx) => (
+                    <div
+                      key={idx}
+                      style={{
+                        backgroundColor: getPeriodColor(p.period),
+                        margin: "0.5rem 0",
+                        padding: "0.5rem",
+                        borderRadius: "4px",
+                      }}
+                    >
+                      <strong>Period {p.period}:</strong>{" "}
+                      {p.courseNames.join(", ")}
+                    </div>
+                  ))}
+                </Card.Body>
+              </Card>
             ) : (
               <p>No most relevant plan found.</p>
             )}
           </div>
 
           {/* Easiest Plans */}
-          <div>
+          <div className="mb-4">
             <h4>Easiest Plans</h4>
             {result.easiestPlans && result.easiestPlans.length > 0 ? (
               result.easiestPlans.map((plan, idx) => (
-                <div key={idx} style={{ marginBottom: "1rem" }}>
-                  <strong>Math & English combo:</strong>{" "}
-                  {plan.mathEnglishCombo}
-                  <ul>
+                <Card
+                  key={idx}
+                  className="mb-3"
+                  style={{ border: "1px solid #ccc" }}
+                >
+                  <Card.Header
+                    style={{ backgroundColor: "#ffe0ff", fontWeight: "bold" }}
+                  >
+                    Math &amp; English combo: {plan.mathEnglishCombo}
+                  </Card.Header>
+                  <Card.Body>
                     {plan.periods.map((p) => (
-                      <li key={p.period}>
-                        <b>Period {p.period}:</b> {p.courseNames.join(", ")}
-                      </li>
+                      <div
+                        key={p.period}
+                        style={{
+                          backgroundColor: getPeriodColor(p.period),
+                          margin: "0.5rem 0",
+                          padding: "0.5rem",
+                          borderRadius: "4px",
+                        }}
+                      >
+                        <strong>Period {p.period}:</strong>{" "}
+                        {p.courseNames.join(", ")}
+                      </div>
                     ))}
-                  </ul>
-                </div>
+                  </Card.Body>
+                </Card>
               ))
             ) : (
               <p>No easiest plan found.</p>

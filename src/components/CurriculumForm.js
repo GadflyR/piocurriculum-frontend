@@ -1,12 +1,20 @@
-// src/components/CurriculumForm.js
 import React, { useState, useEffect } from "react";
-import { Form, Row, Col, Button, ProgressBar, Accordion, Card } from "react-bootstrap";
+import { Accordion, Form, Row, Col, Button, ProgressBar, Card } from "react-bootstrap";
 import { generatePlan } from "../services/curriculumService.js";
-
-import { ALL_COURSES } from "../utils/courseData.js";
 import { groupCoursesBySubject } from "../utils/groupCoursesBySubject.js";
+import { ALL_COURSES } from "../utils/courseData.js";
 
-// For controlling the subject order in our UI
+const MAJOR_DIRECTIONS = [
+  { code: 1, label: "STEM" },
+  { code: 2, label: "MEDICAL" },
+  { code: 3, label: "BUSINESS" },
+  { code: 4, label: "SOCIAL_SCIENCE" },
+  { code: 5, label: "ENVIRONMENTAL" },
+  { code: 6, label: "CS_DATA" },
+  { code: 7, label: "LANGUAGE_CULTURE" },
+  { code: 8, label: "LAW_POLICY" },
+];
+
 const SUBJECT_ORDER = [
   "English",
   "Math",
@@ -19,18 +27,29 @@ const SUBJECT_ORDER = [
   "Other",
 ];
 
+// Subtle color for each period (optional).
+const PERIOD_COLORS = {
+  1: "#f9f9f9",
+  2: "#f2f2f2",
+  3: "#efefef",
+  4: "#eaeaea",
+  5: "#e5e5e5",
+  6: "#e0e0e0",
+  7: "#dbdbdb",
+  8: "#d6d6d6",
+};
+
 const CurriculumForm = () => {
   const [grade, setGrade] = useState(9);
   const [majorDirection, setMajorDirection] = useState(1);
   const [completedCourses, setCompletedCourses] = useState([]);
+
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState(null);
 
-  // The grouped courses by subject
   const [coursesBySubject, setCoursesBySubject] = useState({});
 
   useEffect(() => {
-    // Deduplicate & group
     const grouped = groupCoursesBySubject(ALL_COURSES);
     setCoursesBySubject(grouped);
   }, []);
@@ -47,70 +66,76 @@ const CurriculumForm = () => {
     e.preventDefault();
     setIsLoading(true);
     setResult(null);
-
+  
     try {
       const payload = {
         grade: parseInt(grade, 10),
         completedCourses,
         majorDirectionCode: parseInt(majorDirection, 10),
       };
+      console.log("Sending payload:", payload);
+  
       const data = await generatePlan(payload);
+      console.log("Received plan data:", data);
+  
       setResult(data);
-    } catch (err) {
-      console.error("Error generating plan:", err);
+    } catch (error) {
+      console.error("Error generating plan:", error);
     } finally {
       setIsLoading(false);
     }
+  };  
+
+  const getPeriodColor = (period) => {
+    return PERIOD_COLORS[period] || "#f7f7f7";
   };
 
   return (
-    <div className="container mt-4" style={{ fontSize: "1rem" }}>
-      <h2>Curriculum Planner</h2>
+    <div className="container mt-4" style={{ fontSize: "1.02rem" }}>
+      <h2 className="mb-3">Curriculum Planner</h2>
 
       <Form onSubmit={handleSubmit}>
         <Row className="mb-3">
           <Col md={4}>
             <Form.Group controlId="gradeSelect">
               <Form.Label>Student Grade</Form.Label>
-              <Form.Select value={grade} onChange={(e) => setGrade(e.target.value)}>
-                <option value={9}>9</option>
-                <option value={10}>10</option>
-                <option value={11}>11</option>
-                <option value={12}>12</option>
+              <Form.Select
+                value={grade}
+                onChange={(e) => setGrade(e.target.value)}
+              >
+                <option value="9">9</option>
+                <option value="10">10</option>
+                <option value="11">11</option>
+                <option value="12">12</option>
               </Form.Select>
             </Form.Group>
           </Col>
-
           <Col md={4}>
-            <Form.Group controlId="majorDirection">
+            <Form.Group controlId="majorDirectionSelect">
               <Form.Label>Major Direction</Form.Label>
               <Form.Select
                 value={majorDirection}
                 onChange={(e) => setMajorDirection(e.target.value)}
               >
-                <option value={1}>1 - STEM</option>
-                <option value={2}>2 - MEDICAL</option>
-                <option value={3}>3 - BUSINESS</option>
-                <option value={4}>4 - SOCIAL_SCIENCE</option>
-                <option value={5}>5 - ENVIRONMENTAL</option>
-                <option value={6}>6 - CS_DATA</option>
-                <option value={7}>7 - LANGUAGE_CULTURE</option>
-                <option value={8}>8 - LAW_POLICY</option>
+                {MAJOR_DIRECTIONS.map((dir) => (
+                  <option key={dir.code} value={dir.code}>
+                    {dir.code} - {dir.label}
+                  </option>
+                ))}
               </Form.Select>
             </Form.Group>
           </Col>
         </Row>
 
-        {/* Accordion: displays courses by subject */}
-        <Accordion alwaysOpen>
-          {SUBJECT_ORDER.map((subj, idx) => {
-            const list = coursesBySubject[subj] || [];
-            if (!list.length) return null;
+        <Accordion alwaysOpen className="mb-3">
+          {SUBJECT_ORDER.map((subj, index) => {
+            const coursesInSubject = coursesBySubject[subj] || [];
+            if (!coursesInSubject.length) return null;
             return (
-              <Accordion.Item eventKey={String(idx)} key={subj}>
+              <Accordion.Item eventKey={String(index)} key={subj}>
                 <Accordion.Header>{subj}</Accordion.Header>
                 <Accordion.Body>
-                  {list.map((course) => (
+                  {coursesInSubject.map((course) => (
                     <Form.Check
                       key={course}
                       type="checkbox"
@@ -126,7 +151,7 @@ const CurriculumForm = () => {
           })}
         </Accordion>
 
-        <Button type="submit" variant="primary" className="mt-3" disabled={isLoading}>
+        <Button type="submit" variant="primary" disabled={isLoading}>
           Generate Plan
         </Button>
       </Form>
@@ -137,12 +162,105 @@ const CurriculumForm = () => {
         </div>
       )}
 
-      {/* Render results, etc. */}
       {result && !isLoading && (
-        <div className="mt-4">
-          {/* Example rendering of Highest GPA Plans, etc. */}
+        <div className="mt-5">
           <h3>Results</h3>
-          {/* ... */}
+
+          {/* Highest GPA Plans */}
+          <div className="mb-4">
+            <h4 style={{ fontSize: "1.15rem" }}>Highest GPA Plans</h4>
+            {result.highestGpaPlans?.length ? (
+              result.highestGpaPlans.map((plan, idx) => (
+                <Card key={idx} className="mb-3">
+                  <Card.Header style={{ backgroundColor: "#fafafa" }}>
+                    <strong>Math &amp; English combo:</strong>{" "}
+                    {plan.mathEnglishCombo}
+                  </Card.Header>
+                  <Card.Body>
+                    {plan.periods.map((p) => (
+                      <div
+                        key={p.period}
+                        style={{
+                          backgroundColor: getPeriodColor(p.period),
+                          padding: "0.5rem",
+                          marginBottom: "0.5rem",
+                          borderRadius: "3px",
+                        }}
+                      >
+                        <strong>Period {p.period}:</strong>{" "}
+                        {p.courseNames.join(", ")}
+                      </div>
+                    ))}
+                  </Card.Body>
+                </Card>
+              ))
+            ) : (
+              <p>No highest GPA plan found.</p>
+            )}
+          </div>
+
+          {/* Most Relevant Plan */}
+          <div className="mb-4">
+            <h4 style={{ fontSize: "1.15rem" }}>Most Relevant Plan (by period)</h4>
+            {result.mostRelevantPlan?.length ? (
+              <Card className="mb-3">
+                <Card.Header style={{ backgroundColor: "#fafafa" }}>
+                  <strong>Most Relevant Courses</strong>
+                </Card.Header>
+                <Card.Body>
+                  {result.mostRelevantPlan.map((p, idx) => (
+                    <div
+                      key={idx}
+                      style={{
+                        backgroundColor: getPeriodColor(p.period),
+                        padding: "0.5rem",
+                        marginBottom: "0.5rem",
+                        borderRadius: "3px",
+                      }}
+                    >
+                      <strong>Period {p.period}:</strong>{" "}
+                      {p.courseNames.join(", ")}
+                    </div>
+                  ))}
+                </Card.Body>
+              </Card>
+            ) : (
+              <p>No most relevant plan found.</p>
+            )}
+          </div>
+
+          {/* Easiest Plans */}
+          <div className="mb-4">
+            <h4 style={{ fontSize: "1.15rem" }}>Easiest Plans</h4>
+            {result.easiestPlans?.length ? (
+              result.easiestPlans.map((plan, idx) => (
+                <Card key={idx} className="mb-3">
+                  <Card.Header style={{ backgroundColor: "#fafafa" }}>
+                    <strong>Math &amp; English combo:</strong>{" "}
+                    {plan.mathEnglishCombo}
+                  </Card.Header>
+                  <Card.Body>
+                    {plan.periods.map((p) => (
+                      <div
+                        key={p.period}
+                        style={{
+                          backgroundColor: getPeriodColor(p.period),
+                          padding: "0.5rem",
+                          marginBottom: "0.5rem",
+                          borderRadius: "3px",
+                        }}
+                      >
+                        <strong>Period {p.period}:</strong>{" "}
+                        {p.courseNames.join(", ")}
+                      </div>
+                    ))}
+                  </Card.Body>
+                </Card>
+              ))
+            ) : (
+              <p>No easiest plan found.</p>
+            )}
+          </div>
         </div>
       )}
     </div>

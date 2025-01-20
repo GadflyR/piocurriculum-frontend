@@ -3,7 +3,7 @@ import { Accordion, Form, Row, Col, Button, ProgressBar, Card, Alert } from "rea
 import { generatePlan } from "../services/curriculumService";
 import { ALL_COURSES } from "../utils/courseData";
 
-// Utility to unify "CP/Honors"
+// Utility function to unify CP/Honors in names, leaving AP courses alone.
 function unifyNonAPName(name) {
   if (name.includes("AP ")) return name.trim();
   return name
@@ -13,28 +13,119 @@ function unifyNonAPName(name) {
     .trim();
 }
 
-// Group courses by subject: we store them in a map, but unify CP/Honors keys
+/**
+ * This function groups the unified course names by subject, searching
+ * for keywords in the course name (e.g. "biology", "history", "spanish", etc.)
+ * so that we can classify them under:
+ * - English
+ * - Math
+ * - Science
+ * - Social Studies
+ * - World Language
+ * - Computer/Tech
+ * - Business/Financial
+ * - Arts/PE/Elective
+ * - Other
+ */
 function groupCoursesBySubjectUnified(courses) {
   const subjectMap = {};
-  for (const c of courses) {
-    // c is presumably the raw original name from your data
-    // unify it
-    const unified = unifyNonAPName(c);
-    // then figure out subject
-    // For simplicity, let's guess subject by partial keywords
+
+  for (const originalName of courses) {
+    // unify CP/Honors for display
+    const unified = unifyNonAPName(originalName);
+    const lower = unified.toLowerCase();
+
+    // Default to "Other," then refine based on keywords
     let subject = "Other";
-    if (unified.toLowerCase().includes("english")) subject = "English";
-    else if (unified.toLowerCase().includes("algebra") || unified.toLowerCase().includes("geometry") || unified.toLowerCase().includes("calculus")) {
+
+    if (lower.includes("english")) {
+      subject = "English";
+    } else if (
+      lower.includes("algebra") ||
+      lower.includes("geometry") ||
+      lower.includes("calculus") ||
+      lower.includes("statistics") ||
+      lower.includes("precalculus") ||
+      lower.includes("pre calculus") ||
+      lower.includes("sat math")
+    ) {
       subject = "Math";
+    } else if (
+      lower.includes("biology") ||
+      lower.includes("chemistry") ||
+      lower.includes("physics") ||
+      lower.includes("anatomy") ||
+      lower.includes("environmental") ||
+      lower.includes("forensic") ||
+      lower.includes("organic chemistry")
+    ) {
+      subject = "Science";
+    } else if (
+      lower.includes("history") ||
+      lower.includes("government") ||
+      lower.includes("politics") ||
+      lower.includes("sociology") ||
+      lower.includes("anthropology") ||
+      lower.includes("psychology") ||
+      lower.includes("world religions") ||
+      lower.includes("mythology") ||
+      lower.includes("global issues") ||
+      lower.includes("social studies")
+    ) {
+      subject = "Social Studies";
+    } else if (
+      lower.includes("spanish") ||
+      lower.includes("arabic") ||
+      lower.includes("turkish") ||
+      lower.includes("french") ||
+      lower.includes("chinese")
+    ) {
+      subject = "World Language";
+    } else if (
+      lower.includes("computer") ||
+      lower.includes("web") ||
+      lower.includes("cybersecurity") ||
+      lower.includes("programming") ||
+      lower.includes("graphic design") ||
+      lower.includes("dynamic programming") ||
+      lower.includes("tech") ||
+      lower.includes("engineering") ||
+      lower.includes("architectural cad")
+    ) {
+      subject = "Computer/Tech";
+    } else if (
+      lower.includes("financial") ||
+      lower.includes("business") ||
+      lower.includes("entrepreneurship") ||
+      lower.includes("marketing") ||
+      lower.includes("econ") // for "economics"
+    ) {
+      subject = "Business/Financial";
+    } else if (
+      lower.includes("pe/health") ||
+      lower.includes("music") ||
+      lower.includes("pencil and ink") ||
+      lower.includes("drawing and painting") ||
+      lower.includes("art") ||
+      lower.includes("vpa") ||
+      lower.includes("instrumental") ||
+      lower.includes("illustration") ||
+      lower.includes("theater") ||
+      lower.includes("dance") ||
+      lower.includes("animation")
+    ) {
+      subject = "Arts/PE/Elective";
     }
-    // etc. (Fill in your logic)
+
+    // Create a set for the subject if it doesn't exist
     if (!subjectMap[subject]) {
       subjectMap[subject] = new Set();
     }
-    // store the unified name in that set
+    // Store the unified name (to avoid duplicates)
     subjectMap[subject].add(unified);
   }
-  // convert each set to sorted array
+
+  // Convert each set to a sorted array
   const result = {};
   for (const subj in subjectMap) {
     result[subj] = Array.from(subjectMap[subj]).sort();
@@ -42,7 +133,7 @@ function groupCoursesBySubjectUnified(courses) {
   return result;
 }
 
-// We define the subject order for the UI
+// We define the subject order for the UI – the headings in the Accordion
 const SUBJECT_ORDER = [
   "English",
   "Math",
@@ -64,18 +155,17 @@ const CurriculumForm = () => {
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
 
+  // This object maps subjects ("Math", "Science") to arrays of unified course names
   const [coursesBySubject, setCoursesBySubject] = useState({});
 
+  // On mount, group all your course names (ALL_COURSES) by subject
   useEffect(() => {
-    // Suppose ALL_COURSES is your array of original course names:
-    // e.g. ["English 9, CP", "English 9, Honors", "AP English Lit", ...]
-    // We'll unify them for display so CP/Honors appear as a single checkbox.
     const grouped = groupCoursesBySubjectUnified(ALL_COURSES);
     setCoursesBySubject(grouped);
   }, []);
 
+  // Toggle a course in the completedCourses array
   const handleCourseToggle = (unifiedName) => {
-    // If user toggles "English 9," we store "English 9" in completedCourses
     setCompletedCourses((prev) =>
       prev.includes(unifiedName)
         ? prev.filter((c) => c !== unifiedName)
@@ -83,6 +173,7 @@ const CurriculumForm = () => {
     );
   };
 
+  // Handle form submission to generate the plan
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
@@ -91,10 +182,7 @@ const CurriculumForm = () => {
 
     const payload = {
       grade: parseInt(grade, 10),
-      // We directly send the unified names to the backend
-      // The backend's unifyCompletedCourses() won't break anything,
-      // but it effectively sees them as already unified.
-      completedCourses: completedCourses,
+      completedCourses: completedCourses, // we pass the unified names
       majorDirectionCode: parseInt(majorDirection, 10),
     };
 
@@ -151,21 +239,22 @@ const CurriculumForm = () => {
 
         <div className="mb-3">
           <p>
-            Please select any courses you've taken in the past. Honors/CP are
-            merged into one label (e.g., "English 9").
+            Please select any courses you've taken in the past. CP/Honors courses
+            are merged into a single label (e.g., "English 9"). AP courses remain
+            labeled as "AP ...".
           </p>
         </div>
 
         <Accordion alwaysOpen className="mb-3">
-          {SUBJECT_ORDER.map((subj, idx) => {
-            const unifiedArray = coursesBySubject[subj] || [];
-            if (!unifiedArray.length) return null;
+          {SUBJECT_ORDER.map((subj, index) => {
+            const coursesInThisSubject = coursesBySubject[subj] || [];
+            if (!coursesInThisSubject.length) return null;
 
             return (
-              <Accordion.Item eventKey={String(idx)} key={subj}>
+              <Accordion.Item eventKey={String(index)} key={subj}>
                 <Accordion.Header>{subj}</Accordion.Header>
                 <Accordion.Body>
-                  {unifiedArray.map((unifiedName) => (
+                  {coursesInThisSubject.map((unifiedName) => (
                     <Form.Check
                       key={unifiedName}
                       type="checkbox"
@@ -201,18 +290,19 @@ const CurriculumForm = () => {
       {result && !isLoading && (
         <div className="mt-5">
           <h3>Results</h3>
-          {/* Example output for highest/easiest/most relevant */}
+
+          {/* Highest GPA Plans */}
           <div className="mb-4">
             <h4>Highest GPA Plans</h4>
             {result.highestGpaPlans?.length ? (
-              result.highestGpaPlans.map((plan, i) => (
-                <Card key={i} className="mb-3">
+              result.highestGpaPlans.map((plan, idx) => (
+                <Card key={idx} className="mb-3">
                   <Card.Header>
                     <strong>{plan.mathEnglishCombo}</strong>
                   </Card.Header>
                   <Card.Body>
                     {plan.periods.map((p) => (
-                      <div key={p.period}>
+                      <div key={p.period} className="mb-2">
                         <strong>Period {p.period}:</strong> {p.courseNames.join(", ")}
                       </div>
                     ))}
@@ -224,16 +314,17 @@ const CurriculumForm = () => {
             )}
           </div>
 
+          {/* Most Relevant Plan */}
           <div className="mb-4">
             <h4>Most Relevant Plan</h4>
             {result.mostRelevantPlan?.length ? (
-              <Card>
+              <Card className="mb-3">
                 <Card.Header>Most Relevant</Card.Header>
                 <Card.Body>
-                  {result.mostRelevantPlan.map((r, idx) => (
-                    <p key={idx}>
-                      <strong>Period {r.period}:</strong> {r.courseNames.join(", ")}
-                    </p>
+                  {result.mostRelevantPlan.map((p, idx) => (
+                    <div key={idx} className="mb-2">
+                      <strong>Period {p.period}:</strong> {p.courseNames.join(", ")}
+                    </div>
                   ))}
                 </Card.Body>
               </Card>
@@ -242,17 +333,18 @@ const CurriculumForm = () => {
             )}
           </div>
 
+          {/* Easiest Plans */}
           <div className="mb-4">
             <h4>Easiest Plans</h4>
             {result.easiestPlans?.length ? (
-              result.easiestPlans.map((plan, i) => (
-                <Card key={i} className="mb-3">
+              result.easiestPlans.map((plan, idx) => (
+                <Card key={idx} className="mb-3">
                   <Card.Header>
                     <strong>{plan.mathEnglishCombo}</strong>
                   </Card.Header>
                   <Card.Body>
                     {plan.periods.map((p) => (
-                      <div key={p.period}>
+                      <div key={p.period} className="mb-2">
                         <strong>Period {p.period}:</strong> {p.courseNames.join(", ")}
                       </div>
                     ))}

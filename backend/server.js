@@ -625,6 +625,56 @@ function filterCourses(all, completedNames, grade, req, completedObjs) {
   return res;
 }
 
+function mergePlansByPeriod(plans) {
+  // Group all plans by their mathEnglishCombo string
+  const groups = new Map();
+  for (const plan of plans) {
+    const key = plan.mathEnglishCombo;
+    if (!groups.has(key)) {
+      groups.set(key, []);
+    }
+    groups.get(key).push(plan);
+  }
+
+  // For each (math&english) group, merge by period
+  const mergedResults = [];
+  for (const [combo, comboPlans] of groups.entries()) {
+    // Build a map of period => set of courseNames
+    const periodMap = new Map();
+
+    for (const plan of comboPlans) {
+      for (const p of plan.periods) {
+        if (!periodMap.has(p.period)) {
+          periodMap.set(p.period, new Set());
+        }
+        // Add each course into the set
+        p.courseNames.forEach((c) => {
+          periodMap.get(p.period).add(c);
+        });
+      }
+    }
+
+    // Convert each period’s set back to an array and sort
+    const mergedPeriods = [];
+    const sortedPeriods = Array.from(periodMap.keys()).sort((a, b) => a - b);
+    for (const period of sortedPeriods) {
+      const courseArr = Array.from(periodMap.get(period));
+      courseArr.sort();
+      mergedPeriods.push({
+        period,
+        courseNames: courseArr,
+      });
+    }
+
+    mergedResults.push({
+      mathEnglishCombo: combo,
+      periods: mergedPeriods,
+    });
+  }
+
+  return mergedResults;
+}
+
 function generateAllPossiblePlans(periodMap, grade) {
   if (!periodMap || Object.keys(periodMap).length === 0) {
     return [];
@@ -998,7 +1048,8 @@ app.post("/api/curriculum/plan", (req, res) => {
   const mostRelevant = getMostRelevantPlan(feasiblePlans, directionStr);
 
   // transform highest/easiest into planList format
-  const highestGpaPlans = transformPlanList(highestGPA);
+  const highestGpaPlansRaw = transformPlanList(highestGPA);
+  const highestGpaPlans = mergePlansByPeriod(highestGpaPlansRaw);
   const easiestPlans = transformPlanList(easiest);
 
   // mostRelevant is period => courseNames

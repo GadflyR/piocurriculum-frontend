@@ -1,4 +1,3 @@
-// src/components/CurriculumForm.js
 import React, { useState, useEffect } from "react";
 import { Accordion, Form, Row, Col, Button, ProgressBar, Card, Alert } from "react-bootstrap";
 import { generatePlan } from "../services/curriculumService.js";
@@ -28,7 +27,7 @@ const SUBJECT_ORDER = [
   "Other",
 ];
 
-// Subtle color for each period (optional).
+// (Optional) subtle color for each period
 const PERIOD_COLORS = {
   1: "#f9f9f9",
   2: "#f2f2f2",
@@ -40,23 +39,31 @@ const PERIOD_COLORS = {
   8: "#d6d6d6",
 };
 
+// Helper function to chunk an array into smaller arrays of a specified size
+const chunkArray = (array, size) => {
+  const chunkedArray = [];
+  for (let i = 0; i < array.length; i += size) {
+    chunkedArray.push(array.slice(i, i + size));
+  }
+  return chunkedArray;
+};
+
 const CurriculumForm = () => {
   const [grade, setGrade] = useState(9);
   const [majorDirection, setMajorDirection] = useState(1);
   const [completedCourses, setCompletedCourses] = useState([]);
-
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState(null);
-  const [error, setError] = useState(null); // New state for errors
+  const [error, setError] = useState(null);
 
   const [coursesBySubject, setCoursesBySubject] = useState({});
 
   useEffect(() => {
     const grouped = groupCoursesBySubject(ALL_COURSES);
     setCoursesBySubject(grouped);
-    console.log("Courses grouped by subject:", grouped); // Debugging
   }, []);
 
+  // Toggle a course in the completedCourses array
   const handleCourseToggle = (courseName) => {
     setCompletedCourses((prev) =>
       prev.includes(courseName)
@@ -65,27 +72,25 @@ const CurriculumForm = () => {
     );
   };
 
+  // Submit the form to generate the plan
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
     setResult(null);
-    setError(null); // Reset error state
+    setError(null);
+
+    const payload = {
+      grade: parseInt(grade, 10),
+      completedCourses,
+      majorDirectionCode: parseInt(majorDirection, 10),
+    };
 
     try {
-      const payload = {
-        grade: parseInt(grade, 10),
-        completedCourses,
-        majorDirectionCode: parseInt(majorDirection, 10),
-      };
-      console.log("Sending payload:", payload); // Debugging
-
       const data = await generatePlan(payload);
-      console.log("Received plan data:", data); // Debugging
-
       setResult(data);
     } catch (error) {
       console.error("Error generating plan:", error);
-      setError("Failed to generate plan. Please try again."); // Set user-friendly error
+      setError("Failed to generate plan. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -132,24 +137,39 @@ const CurriculumForm = () => {
           </Col>
         </Row>
 
+        <div className="mb-3">
+          <p>Please select any courses you've taken in the past:</p>
+        </div>
+
+        {/* Use an Accordion, but chunk each subject's courses into columns */}
         <Accordion alwaysOpen className="mb-3">
           {SUBJECT_ORDER.map((subj, index) => {
             const coursesInSubject = coursesBySubject[subj] || [];
             if (!coursesInSubject.length) return null;
+
+            // Adjust the chunk size below to control how many courses per column
+            const chunkedCourses = chunkArray(coursesInSubject, 6);
+
             return (
               <Accordion.Item eventKey={String(index)} key={subj}>
                 <Accordion.Header>{subj}</Accordion.Header>
                 <Accordion.Body>
-                  {coursesInSubject.map((course) => (
-                    <Form.Check
-                      key={course}
-                      type="checkbox"
-                      label={course}
-                      checked={completedCourses.includes(course)}
-                      onChange={() => handleCourseToggle(course)}
-                      className="mb-2"
-                    />
-                  ))}
+                  <Row>
+                    {chunkedCourses.map((courseChunk, chunkIndex) => (
+                      <Col md={4} key={`${subj}-chunk-${chunkIndex}`}>
+                        {courseChunk.map((course) => (
+                          <Form.Check
+                            key={course}
+                            type="checkbox"
+                            label={course}
+                            checked={completedCourses.includes(course)}
+                            onChange={() => handleCourseToggle(course)}
+                            className="mb-2"
+                          />
+                        ))}
+                      </Col>
+                    ))}
+                  </Row>
                 </Accordion.Body>
               </Accordion.Item>
             );
@@ -159,13 +179,13 @@ const CurriculumForm = () => {
         <Button type="submit" variant="primary" disabled={isLoading}>
           Generate Plan
         </Button>
-      </Form>
 
-      {isLoading && (
-        <div className="mt-3">
-          <ProgressBar animated now={100} label="Generating..." />
-        </div>
-      )}
+        {isLoading && (
+          <div className="mt-3">
+            <ProgressBar animated now={100} label="Generating..." />
+          </div>
+        )}
+      </Form>
 
       {error && (
         <Alert variant="danger" className="mt-3">
@@ -184,8 +204,7 @@ const CurriculumForm = () => {
               result.highestGpaPlans.map((plan, idx) => (
                 <Card key={idx} className="mb-3">
                   <Card.Header style={{ backgroundColor: "#fafafa" }}>
-                    <strong>Math &amp; English combo:</strong>{" "}
-                    {plan.mathEnglishCombo}
+                    <strong>Math &amp; English combo:</strong> {plan.mathEnglishCombo}
                   </Card.Header>
                   <Card.Body>
                     {plan.periods.map((p) => (

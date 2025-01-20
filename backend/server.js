@@ -501,18 +501,18 @@ function unifyCompletedCourses(userCompleted) {
 // Helper to find the next English if user has completed the normal one
 function getRequiredEnglishForGrade(grade, completedUnifiedSet) {
   if (grade === 9) {
-    if ([...completedUnifiedSet].some((c) => c.includes("English 9"))) {
+    if ([...completedUnifiedSet].some((c) => c.toLowerCase() === "english 9")) {
       return "English 10";
     }
     return "English 9";
   } else if (grade === 10) {
-    if ([...completedUnifiedSet].some((c) => c.includes("English 10"))) {
+    if ([...completedUnifiedSet].some((c) => c.toLowerCase() === "english 10")) {
       return "English 11";
     }
     return "English 10";
   } else if (grade === 11) {
     if ([...completedUnifiedSet].some((c) =>
-      c.includes("English 11") || c.includes("AP English")
+      c.toLowerCase() === "english 11" || c.toLowerCase().includes("ap english")
     )) {
       return "English 12";
     }
@@ -576,7 +576,7 @@ function filterCourses(allCourses, completedUnifiedSet, grade, req) {
 
     // Check if the course is the required English for this grade
     if (course.category === CourseCategory.ENGLISH) {
-      if (course.name.toLowerCase() !== requiredEnglish.toLowerCase()) {
+      if (unifyNonAPName(course.name).toLowerCase() !== unifyNonAPName(requiredEnglish).toLowerCase()) {
         continue; // Only include the required English
       }
     }
@@ -650,34 +650,7 @@ function getNonMathCategoryBase(courseName) {
 }
 
 // =========================================================================
-// 7) ENGLISH REQUIREMENT BASED ON GRADE AND COMPLETED COURSES
-// =========================================================================
-function getRequiredEnglishForGrade(grade, completedUnifiedSet) {
-  if (grade === 9) {
-    if ([...completedUnifiedSet].some((c) => c.toLowerCase() === "english 9")) {
-      return "English 10";
-    }
-    return "English 9";
-  } else if (grade === 10) {
-    if ([...completedUnifiedSet].some((c) => c.toLowerCase() === "english 10")) {
-      return "English 11";
-    }
-    return "English 10";
-  } else if (grade === 11) {
-    if ([...completedUnifiedSet].some((c) =>
-      c.toLowerCase() === "english 11" || c.toLowerCase().includes("ap english")
-    )) {
-      return "English 12";
-    }
-    return "English 11";
-  } else if (grade === 12) {
-    return "English 12"; // Always require English 12 for 12th grade
-  }
-  return "English 9"; // Fallback
-}
-
-// =========================================================================
-// 8) GENERATE ALL POSSIBLE PLANS
+// 7) GENERATE ALL POSSIBLE PLANS
 // =========================================================================
 function generateAllPossiblePlans(periodMap) {
   const periods = Object.keys(periodMap).map(Number).sort((a, b) => a - b);
@@ -712,7 +685,7 @@ function checkNoDuplicateUnified(plan) {
 }
 
 // =========================================================================
-// 9) FEASIBILITY CHECKS
+// 8) FEASIBILITY CHECKS
 // =========================================================================
 function isFeasible(plan, grade, completedUnifiedSet) {
   // must have exactly 1 math
@@ -727,7 +700,9 @@ function isFeasible(plan, grade, completedUnifiedSet) {
   if (eng.length !== 1) return false;
 
   const englishCourse = eng[0];
-  if (englishCourse.name.toLowerCase() !== requiredEnglish.toLowerCase()) {
+  
+  // Modified comparison using unifyNonAPName
+  if (unifyNonAPName(englishCourse.name).toLowerCase() !== unifyNonAPName(requiredEnglish).toLowerCase()) {
     return false;
   }
 
@@ -735,7 +710,7 @@ function isFeasible(plan, grade, completedUnifiedSet) {
 }
 
 // =========================================================================
-// 10) SUMMARIES
+// 9) SUMMARIES
 // =========================================================================
 function averageGPA(plan) {
   let sum = 0;
@@ -894,7 +869,7 @@ function isCourseInMajor(directionStr, c) {
 }
 
 // =========================================================================
-// 9) PLANNING FUNCTIONS
+// 10) PLANNING FUNCTIONS
 // =========================================================================
 
 // Convert plan => { mathEnglishCombo, periods: [ {period, courseNames[]} ] }
@@ -961,7 +936,7 @@ function mergePlansByPeriod(planJSON) {
 }
 
 // =========================================================================
-// 10) MAIN ENDPOINT: /api/curriculum/plan
+// 11) MAIN ENDPOINT: /api/curriculum/plan
 // =========================================================================
 app.post("/api/curriculum/plan", (req, res) => {
   const { grade, completedCourses, majorDirectionCode } = req.body;
@@ -1001,7 +976,7 @@ app.post("/api/curriculum/plan", (req, res) => {
   // Step 7: Filter feasible plans
   const feasible = [];
   for (const plan of allPlans) {
-    if (isFeasible(plan, grade, completedUnified)) {
+    if (isFeasible(plan, grade, new Set(completedUnified))) {
       feasible.push(plan);
     }
   }
@@ -1037,7 +1012,7 @@ app.post("/api/curriculum/plan", (req, res) => {
 });
 
 // =========================================================================
-// 11) START SERVER
+// 12) START SERVER
 // =========================================================================
 app.listen(PORT, () => {
   console.log(`Server listening on port ${PORT}...`);

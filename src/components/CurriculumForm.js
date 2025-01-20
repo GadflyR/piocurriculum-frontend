@@ -1,11 +1,8 @@
-// src/components/CurriculumForm.js
-
 import React, { useState, useEffect } from "react";
 import { Accordion, Form, Row, Col, Button, ProgressBar, Card } from "react-bootstrap";
 import { generatePlan } from "../services/curriculumService.js";
 import { ALL_COURSES, groupCoursesBySubject } from "../utils/courseSubjectUtil.js";
 
-// For major direction
 const MAJOR_DIRECTIONS = [
   { code: 1, label: "STEM" },
   { code: 2, label: "MEDICAL" },
@@ -29,24 +26,26 @@ const SUBJECT_ORDER = [
   "Other",
 ];
 
-// Example color map for each period. Feel free to expand if you have more periods.
+// Subtle color for each period (optional).
 const PERIOD_COLORS = {
-  1: "#ffe0e0", // light red-ish
-  2: "#ffecc2", // light orange
-  3: "#fff7b3", // light yellow
-  4: "#d8f7d8", // light green
-  5: "#d5f2ff", // light blue
-  6: "#e7d5ff", // light purple
-  7: "#f9d5ff", // pink/purple
-  8: "#ffd5f5", // pink
+  1: "#f9f9f9",
+  2: "#f2f2f2",
+  3: "#efefef",
+  4: "#eaeaea",
+  5: "#e5e5e5",
+  6: "#e0e0e0",
+  7: "#dbdbdb",
+  8: "#d6d6d6",
 };
 
 const CurriculumForm = () => {
   const [grade, setGrade] = useState(9);
   const [majorDirection, setMajorDirection] = useState(1);
   const [completedCourses, setCompletedCourses] = useState([]);
+
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState(null);
+
   const [coursesBySubject, setCoursesBySubject] = useState({});
 
   useEffect(() => {
@@ -54,15 +53,12 @@ const CurriculumForm = () => {
     setCoursesBySubject(grouped);
   }, []);
 
-  // Toggle a course in our completedCourses array
   const handleCourseToggle = (courseName) => {
-    setCompletedCourses((prev) => {
-      if (prev.includes(courseName)) {
-        return prev.filter((c) => c !== courseName);
-      } else {
-        return [...prev, courseName];
-      }
-    });
+    setCompletedCourses((prev) =>
+      prev.includes(courseName)
+        ? prev.filter((c) => c !== courseName)
+        : [...prev, courseName]
+    );
   };
 
   const handleSubmit = async (e) => {
@@ -73,7 +69,7 @@ const CurriculumForm = () => {
     try {
       const payload = {
         grade: parseInt(grade, 10),
-        completedCourses: completedCourses,
+        completedCourses,
         majorDirectionCode: parseInt(majorDirection, 10),
       };
       const data = await generatePlan(payload);
@@ -85,17 +81,14 @@ const CurriculumForm = () => {
     }
   };
 
-  // Helper to get the background color for each period
   const getPeriodColor = (period) => {
-    return PERIOD_COLORS[period] || "#f0f0f0"; // fallback color
+    return PERIOD_COLORS[period] || "#f7f7f7";
   };
 
   return (
-    <div className="container mt-4" style={{ fontSize: "1.1rem" }}>
-      {/* Title */}
+    <div className="container mt-4" style={{ fontSize: "1.02rem" }}>
       <h2 className="mb-3">Curriculum Planner</h2>
 
-      {/* Form for grade & direction */}
       <Form onSubmit={handleSubmit}>
         <Row className="mb-3">
           <Col md={4}>
@@ -129,13 +122,10 @@ const CurriculumForm = () => {
           </Col>
         </Row>
 
-        {/* Accordion with courses grouped by subject */}
-        <Accordion defaultActiveKey="0" alwaysOpen className="mb-3">
+        <Accordion alwaysOpen className="mb-3">
           {SUBJECT_ORDER.map((subj, index) => {
             const coursesInSubject = coursesBySubject[subj] || [];
-            if (coursesInSubject.length === 0) {
-              return null; // skip if no courses in that subject
-            }
+            if (!coursesInSubject.length) return null;
             return (
               <Accordion.Item eventKey={String(index)} key={subj}>
                 <Accordion.Header>{subj}</Accordion.Header>
@@ -156,43 +146,30 @@ const CurriculumForm = () => {
           })}
         </Accordion>
 
-        {/* Submit button */}
         <Button type="submit" variant="primary" disabled={isLoading}>
           Generate Plan
         </Button>
       </Form>
 
-      {/* Progress bar while loading */}
       {isLoading && (
         <div className="mt-3">
-          <ProgressBar
-            animated
-            now={100}
-            label="Generating..."
-            style={{ height: "30px" }}
-          />
+          <ProgressBar animated now={100} label="Generating..." />
         </div>
       )}
 
-      {/* Results */}
       {result && !isLoading && (
-        <div className="mt-5" style={{ fontSize: "1.1rem" }}>
+        <div className="mt-5">
           <h3>Results</h3>
 
           {/* Highest GPA Plans */}
           <div className="mb-4">
-            <h4>Highest GPA Plans</h4>
-            {result.highestGpaPlans && result.highestGpaPlans.length > 0 ? (
+            <h4 style={{ fontSize: "1.15rem" }}>Highest GPA Plans</h4>
+            {result.highestGpaPlans?.length ? (
               result.highestGpaPlans.map((plan, idx) => (
-                <Card
-                  key={idx}
-                  className="mb-3"
-                  style={{ border: "1px solid #ccc" }}
-                >
-                  <Card.Header
-                    style={{ backgroundColor: "#e0ffe0", fontWeight: "bold" }}
-                  >
-                    Math &amp; English combo: {plan.mathEnglishCombo}
+                <Card key={idx} className="mb-3">
+                  <Card.Header style={{ backgroundColor: "#fafafa" }}>
+                    <strong>Math &amp; English combo:</strong>{" "}
+                    {plan.mathEnglishCombo}
                   </Card.Header>
                   <Card.Body>
                     {plan.periods.map((p) => (
@@ -200,9 +177,9 @@ const CurriculumForm = () => {
                         key={p.period}
                         style={{
                           backgroundColor: getPeriodColor(p.period),
-                          margin: "0.5rem 0",
                           padding: "0.5rem",
-                          borderRadius: "4px",
+                          marginBottom: "0.5rem",
+                          borderRadius: "3px",
                         }}
                       >
                         <strong>Period {p.period}:</strong>{" "}
@@ -219,13 +196,11 @@ const CurriculumForm = () => {
 
           {/* Most Relevant Plan */}
           <div className="mb-4">
-            <h4>Most Relevant Plan (by period)</h4>
-            {result.mostRelevantPlan && result.mostRelevantPlan.length > 0 ? (
-              <Card className="mb-3" style={{ border: "1px solid #ccc" }}>
-                <Card.Header
-                  style={{ backgroundColor: "#e0f7ff", fontWeight: "bold" }}
-                >
-                  Most Relevant Courses
+            <h4 style={{ fontSize: "1.15rem" }}>Most Relevant Plan (by period)</h4>
+            {result.mostRelevantPlan?.length ? (
+              <Card className="mb-3">
+                <Card.Header style={{ backgroundColor: "#fafafa" }}>
+                  <strong>Most Relevant Courses</strong>
                 </Card.Header>
                 <Card.Body>
                   {result.mostRelevantPlan.map((p, idx) => (
@@ -233,9 +208,9 @@ const CurriculumForm = () => {
                       key={idx}
                       style={{
                         backgroundColor: getPeriodColor(p.period),
-                        margin: "0.5rem 0",
                         padding: "0.5rem",
-                        borderRadius: "4px",
+                        marginBottom: "0.5rem",
+                        borderRadius: "3px",
                       }}
                     >
                       <strong>Period {p.period}:</strong>{" "}
@@ -251,18 +226,13 @@ const CurriculumForm = () => {
 
           {/* Easiest Plans */}
           <div className="mb-4">
-            <h4>Easiest Plans</h4>
-            {result.easiestPlans && result.easiestPlans.length > 0 ? (
+            <h4 style={{ fontSize: "1.15rem" }}>Easiest Plans</h4>
+            {result.easiestPlans?.length ? (
               result.easiestPlans.map((plan, idx) => (
-                <Card
-                  key={idx}
-                  className="mb-3"
-                  style={{ border: "1px solid #ccc" }}
-                >
-                  <Card.Header
-                    style={{ backgroundColor: "#ffe0ff", fontWeight: "bold" }}
-                  >
-                    Math &amp; English combo: {plan.mathEnglishCombo}
+                <Card key={idx} className="mb-3">
+                  <Card.Header style={{ backgroundColor: "#fafafa" }}>
+                    <strong>Math &amp; English combo:</strong>{" "}
+                    {plan.mathEnglishCombo}
                   </Card.Header>
                   <Card.Body>
                     {plan.periods.map((p) => (
@@ -270,9 +240,9 @@ const CurriculumForm = () => {
                         key={p.period}
                         style={{
                           backgroundColor: getPeriodColor(p.period),
-                          margin: "0.5rem 0",
                           padding: "0.5rem",
-                          borderRadius: "4px",
+                          marginBottom: "0.5rem",
+                          borderRadius: "3px",
                         }}
                       >
                         <strong>Period {p.period}:</strong>{" "}

@@ -501,18 +501,18 @@ function unifyCompletedCourses(userCompleted) {
 // Helper to find the next English if user has completed the normal one
 function getRequiredEnglishForGrade(grade, completedUnifiedSet) {
   if (grade === 9) {
-    if ([...completedUnifiedSet].some((c) => c.toLowerCase() === "english 9")) {
+    if ([...completedUnifiedSet].some((c) => unifyNonAPName(c).toLowerCase() === "english 9")) {
       return "English 10";
     }
     return "English 9";
   } else if (grade === 10) {
-    if ([...completedUnifiedSet].some((c) => c.toLowerCase() === "english 10")) {
+    if ([...completedUnifiedSet].some((c) => unifyNonAPName(c).toLowerCase() === "english 10")) {
       return "English 11";
     }
     return "English 10";
   } else if (grade === 11) {
     if ([...completedUnifiedSet].some((c) =>
-      c.toLowerCase() === "english 11" || c.toLowerCase().includes("ap english")
+      unifyNonAPName(c).toLowerCase() === "english 11" || unifyNonAPName(c).toLowerCase().includes("ap english")
     )) {
       return "English 12";
     }
@@ -529,7 +529,7 @@ function filterCourses(allCourses, completedUnifiedSet, grade, req) {
   // Collect conflict bases from user's completed courses
   const userConflictBases = new Set();
   for (const unifiedName of completedUnifiedSet) {
-    const base = unifiedName.replace("AP ", "").trim();
+    const base = unifyNonAPName(unifiedName).replace("AP ", "").trim();
     if (CONFLICT_BASES.has(base)) {
       userConflictBases.add(base);
     }
@@ -548,7 +548,7 @@ function filterCourses(allCourses, completedUnifiedSet, grade, req) {
   // Track highest levels for non-math categories with a "base"
   const highestNonMathLevelMap = {};
   for (const cName of completedUnifiedSet) {
-    const nm = getNonMathCategoryBase(cName);
+    const nm = getNonMathCategoryBase(unifyNonAPName(cName));
     if (nm) {
       const lvl = rawCourseLevelMap.get(cName) || 0;
       if (!(nm in highestNonMathLevelMap)) {
@@ -598,7 +598,7 @@ function filterCourses(allCourses, completedUnifiedSet, grade, req) {
       }
     } else {
       // For non-Math categories with a "base", ensure it's higher than completed
-      const nm = getNonMathCategoryBase(course.unifiedName);
+      const nm = getNonMathCategoryBase(unifyNonAPName(course.unifiedName));
       if (nm) {
         const cLevel = course.level;
         const maxLvl = highestNonMathLevelMap[nm] || 0;
@@ -700,7 +700,7 @@ function isFeasible(plan, grade, completedUnifiedSet) {
   if (eng.length !== 1) return false;
 
   const englishCourse = eng[0];
-  
+
   // Modified comparison using unifyNonAPName
   if (unifyNonAPName(englishCourse.name).toLowerCase() !== unifyNonAPName(requiredEnglish).toLowerCase()) {
     return false;
@@ -770,9 +770,13 @@ function getMostRelevantPlan(feasible, direction) {
       cands.push(...found);
     }
     // Remove duplicates (based on unifiedName)
-    cands = Array.from(new Set(cands.map(c => c.unifiedName))).map(unifiedName => {
-      return feasible.find(plan => plan.some(c => c.unifiedName === unifiedName)).find(c => c.unifiedName === unifiedName);
-    });
+    const uniqueCandsMap = new Map();
+    for (const c of cands) {
+      if (!uniqueCandsMap.has(c.unifiedName)) {
+        uniqueCandsMap.set(c.unifiedName, c);
+      }
+    }
+    cands = Array.from(uniqueCandsMap.values());
 
     // Only include courses in the major
     cands = cands.filter((c) => isCourseInMajor(direction, c));

@@ -214,28 +214,26 @@ const CurriculumForm = () => {
           <div className="mb-4">
             <h4 style={{ fontSize: "1.15rem" }}>Most Relevant Plan (by period)</h4>
             {result.mostRelevantPlan?.length ? (
-              result.mostRelevantPlan.map((p, idx) => (
-                <Card key={idx} className="mb-3">
-                  <Card.Header style={{ backgroundColor: "#fafafa" }}>
-                    <strong>Most Relevant Courses</strong>
-                  </Card.Header>
-                  <Card.Body>
-                    {p.courseNames.map((course, courseIdx) => (
-                      <div
-                        key={courseIdx}
-                        style={{
-                          backgroundColor: getPeriodColor(p.period),
-                          padding: "0.5rem",
-                          marginBottom: "0.5rem",
-                          borderRadius: "3px",
-                        }}
-                      >
-                        <strong>Period {p.period}:</strong> {course}
-                      </div>
-                    ))}
-                  </Card.Body>
-                </Card>
-              ))
+              <Card className="mb-3">
+                <Card.Header style={{ backgroundColor: "#fafafa" }}>
+                  <strong>Most Relevant Courses</strong>
+                </Card.Header>
+                <Card.Body>
+                  {result.mostRelevantPlan.map((p, idx) => (
+                    <div
+                      key={idx}
+                      style={{
+                        backgroundColor: getPeriodColor(p.period),
+                        padding: "0.5rem",
+                        marginBottom: "0.5rem",
+                        borderRadius: "3px",
+                      }}
+                    >
+                      <strong>Period {p.period}:</strong> {p.courseNames.join(", ")}
+                    </div>
+                  ))}
+                </Card.Body>
+              </Card>
             ) : (
               <p>No most relevant plan found.</p>
             )}

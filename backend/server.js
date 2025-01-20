@@ -1050,7 +1050,8 @@ app.post("/api/curriculum/plan", (req, res) => {
   // transform highest/easiest into planList format
   const highestGpaPlansRaw = transformPlanList(highestGPA);
   const highestGpaPlans = mergePlansByPeriod(highestGpaPlansRaw);
-  const easiestPlans = transformPlanList(easiest);
+  const easiestPlansRaw = transformPlanList(easiest);
+  const easiestPlans = mergePlansByPeriod(easiestPlansRaw);
 
   // mostRelevant is period => courseNames
   const response = {

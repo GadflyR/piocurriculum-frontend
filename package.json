@@ -41,17 +41,7 @@
       "last 1 safari version"
     ]
   },
-  "jest": {
-    "transform": {
-      "^.+\\.[jt]sx?$": "babel-jest"
-    },
-    "transformIgnorePatterns": [
-      "/node_modules/(?!(axios)/)"
-    ],
-    "moduleNameMapper": {
-      "\\.(css|less)$": "identity-obj-proxy"
-    }
-  },
+
   "devDependencies": {
     "@babel/core": "^7.26.0",
     "@babel/plugin-proposal-private-property-in-object": "^7.21.11",

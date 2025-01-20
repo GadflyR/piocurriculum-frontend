@@ -9,6 +9,11 @@ const API_URL =
     : "https://piocurriculum-hjc7cqeubxbvehgb.eastus2-01.azurewebsites.net/api/curriculum";
 
 export const generatePlan = async (payload) => {
-  const response = await axios.post(`${API_URL}/plan`, payload);
-  return response.json();
+  try {
+    const response = await axios.post(`${API_URL}/plan`, payload);
+    return response.data;
+  } catch (error) {
+    console.error("Error in generatePlan:", error);
+    throw error; // Re-throw to handle it in the caller
+  }
 };

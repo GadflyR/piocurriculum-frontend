@@ -1,5 +1,6 @@
+// src/components/CurriculumForm.js
 import React, { useState, useEffect } from "react";
-import { Accordion, Form, Row, Col, Button, ProgressBar, Card } from "react-bootstrap";
+import { Accordion, Form, Row, Col, Button, ProgressBar, Card, Alert } from "react-bootstrap";
 import { generatePlan } from "../services/curriculumService.js";
 import { groupCoursesBySubject } from "../utils/groupCoursesBySubject.js";
 import { ALL_COURSES } from "../utils/courseData.js";
@@ -46,12 +47,14 @@ const CurriculumForm = () => {
 
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState(null);
+  const [error, setError] = useState(null); // New state for errors
 
   const [coursesBySubject, setCoursesBySubject] = useState({});
 
   useEffect(() => {
     const grouped = groupCoursesBySubject(ALL_COURSES);
     setCoursesBySubject(grouped);
+    console.log("Courses grouped by subject:", grouped); // Debugging
   }, []);
 
   const handleCourseToggle = (courseName) => {
@@ -66,25 +69,27 @@ const CurriculumForm = () => {
     e.preventDefault();
     setIsLoading(true);
     setResult(null);
-  
+    setError(null); // Reset error state
+
     try {
       const payload = {
         grade: parseInt(grade, 10),
         completedCourses,
         majorDirectionCode: parseInt(majorDirection, 10),
       };
-      console.log("Sending payload:", payload);
-  
+      console.log("Sending payload:", payload); // Debugging
+
       const data = await generatePlan(payload);
-      console.log("Received plan data:", data);
-  
+      console.log("Received plan data:", data); // Debugging
+
       setResult(data);
     } catch (error) {
       console.error("Error generating plan:", error);
+      setError("Failed to generate plan. Please try again."); // Set user-friendly error
     } finally {
       setIsLoading(false);
     }
-  };  
+  };
 
   const getPeriodColor = (period) => {
     return PERIOD_COLORS[period] || "#f7f7f7";
@@ -162,6 +167,12 @@ const CurriculumForm = () => {
         </div>
       )}
 
+      {error && (
+        <Alert variant="danger" className="mt-3">
+          {error}
+        </Alert>
+      )}
+
       {result && !isLoading && (
         <div className="mt-5">
           <h3>Results</h3>
@@ -203,27 +214,28 @@ const CurriculumForm = () => {
           <div className="mb-4">
             <h4 style={{ fontSize: "1.15rem" }}>Most Relevant Plan (by period)</h4>
             {result.mostRelevantPlan?.length ? (
-              <Card className="mb-3">
-                <Card.Header style={{ backgroundColor: "#fafafa" }}>
-                  <strong>Most Relevant Courses</strong>
-                </Card.Header>
-                <Card.Body>
-                  {result.mostRelevantPlan.map((p, idx) => (
-                    <div
-                      key={idx}
-                      style={{
-                        backgroundColor: getPeriodColor(p.period),
-                        padding: "0.5rem",
-                        marginBottom: "0.5rem",
-                        borderRadius: "3px",
-                      }}
-                    >
-                      <strong>Period {p.period}:</strong>{" "}
-                      {p.courseNames.join(", ")}
-                    </div>
-                  ))}
-                </Card.Body>
-              </Card>
+              result.mostRelevantPlan.map((p, idx) => (
+                <Card key={idx} className="mb-3">
+                  <Card.Header style={{ backgroundColor: "#fafafa" }}>
+                    <strong>Most Relevant Courses</strong>
+                  </Card.Header>
+                  <Card.Body>
+                    {p.courseNames.map((course, courseIdx) => (
+                      <div
+                        key={courseIdx}
+                        style={{
+                          backgroundColor: getPeriodColor(p.period),
+                          padding: "0.5rem",
+                          marginBottom: "0.5rem",
+                          borderRadius: "3px",
+                        }}
+                      >
+                        <strong>Period {p.period}:</strong> {course}
+                      </div>
+                    ))}
+                  </Card.Body>
+                </Card>
+              ))
             ) : (
               <p>No most relevant plan found.</p>
             )}

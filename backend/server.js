@@ -581,9 +581,13 @@ function filterCourses(allCourses, completedUnifiedSet, grade, req) {
       }
     }
 
-    // Check grade level
-    if (grade < course.gradeLevelMin || grade > course.gradeLevelMax) {
-      continue;
+    // **Modified Grade Level Check: Bypass for Required English**
+    if (!(course.category === CourseCategory.ENGLISH &&
+          unifyNonAPName(course.name).toLowerCase() === unifyNonAPName(requiredEnglish).toLowerCase())) {
+      // Skip if grade level does not match, except for required English
+      if (grade < course.gradeLevelMin || grade > course.gradeLevelMax) {
+        continue;
+      }
     }
 
     // Check prerequisites

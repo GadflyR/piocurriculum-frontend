@@ -2,7 +2,6 @@
 
 const cors = require('cors');
 const bodyParser = require('body-parser');
-const fileURLToPath = require('url');
 const express = require('express');
 const path = require('path');
 const app = express();
@@ -11,15 +10,17 @@ const PORT = process.env.PORT || 8080;
 app.use(cors());
 app.use(bodyParser.json());
 
+// Serve React build in production (adjust if needed).
 app.use(express.static(path.join(__dirname, '../build')));
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, '../build', 'index.html'));
 });
 
-// ===================== 1) STATIC CONSTANTS (like Java) =====================
-const MAX_PLANS = 1000;
+// ===========================================================================
+// 1) ENUMS & CONSTANTS
+// ===========================================================================
 
-// Enums
+// MajorDirections
 const MajorDirection = {
   STEM: 1,
   MEDICAL: 2,
@@ -41,10 +42,11 @@ function fromCode(c) {
     case 6: return "CS_DATA";
     case 7: return "LANGUAGE_CULTURE";
     case 8: return "LAW_POLICY";
-    default: return "STEM"; // default fallback
+    default: return "STEM";
   }
 }
 
+// CourseCategory
 const CourseCategory = {
   ENGLISH: "ENGLISH",
   MATH: "MATH",
@@ -59,7 +61,26 @@ const CourseCategory = {
   FREE_PERIOD: "FREE_PERIOD",
 };
 
-// GraduationRequirements
+/**
+ * Utility to unify CP/Honors in names, leaving AP alone
+ */
+function unifyNonAPName(originalName) {
+  if (originalName.includes("AP ")) {
+    return originalName.trim();
+  }
+  return originalName
+    .replace("CP/Honors", "")
+    .replace(", CP", "")
+    .replace(", Honors", "")
+    .trim();
+}
+
+// Conflict bases
+const CONFLICT_BASES = new Set(["Biology", "Chemistry", "US History"]);
+
+// ===========================================================================
+// 2) GRADUATION REQUIREMENTS
+// ===========================================================================
 class GraduationRequirements {
   constructor() {
     this.englishNeeded = 20;
@@ -73,8 +94,8 @@ class GraduationRequirements {
     this.lifeCareersNeeded = 5;
     this.electivesNeeded = 30;
   }
-  updateRequirements(completed) {
-    for (const c of completed) {
+  updateRequirements(completedCourses) {
+    for (const c of completedCourses) {
       switch (c.category) {
         case CourseCategory.ENGLISH: this.englishNeeded -= 5; break;
         case CourseCategory.MATH: this.mathNeeded -= 5; break;
@@ -90,7 +111,7 @@ class GraduationRequirements {
           break;
       }
     }
-    // clamp to 0
+    // clamp to zero
     this.englishNeeded = Math.max(0, this.englishNeeded);
     this.mathNeeded = Math.max(0, this.mathNeeded);
     this.scienceNeeded = Math.max(0, this.scienceNeeded);
@@ -102,45 +123,13 @@ class GraduationRequirements {
     this.lifeCareersNeeded = Math.max(0, this.lifeCareersNeeded);
     this.electivesNeeded = Math.max(0, this.electivesNeeded);
   }
-  needThisCategory(cat) {
-    switch (cat) {
-      case CourseCategory.ENGLISH: return this.englishNeeded > 0;
-      case CourseCategory.MATH: return this.mathNeeded > 0;
-      case CourseCategory.SCIENCE: return this.scienceNeeded > 0;
-      case CourseCategory.SOCIAL_STUDIES: return this.socialNeeded > 0;
-      case CourseCategory.FINANCIAL: return this.financialNeeded > 0;
-      case CourseCategory.PE_HEALTH: return this.peHealthNeeded > 0;
-      case CourseCategory.VPA: return this.vpaNeeded > 0;
-      case CourseCategory.WL: return this.wlNeeded > 0;
-      case CourseCategory.LIFE_CAREERS: return this.lifeCareersNeeded > 0;
-      case CourseCategory.ELECTIVES: return this.electivesNeeded > 0;
-      default: return false;
-    }
-  }
 }
 
-/**
- * Utility function to unify non-AP names.
- * Example: "Geometry, CP" → "Geometry", "English 9, Honors" → "English 9"
- * Does not touch “AP” courses.
- */
-function unifyNonAPName(name) {
-  if (name.includes("AP ")) {
-    return name.trim();
-  }
-  return name
-    .replace(", CP", "")
-    .replace(", Honors", "")
-    .replace("CP/Honors", "")
-    .trim();
-}
-
-/**
- * We generate a raw map for course levels then build a unified courseLevelMap.
- * If multiple rawNames unify to the same key, we take the max level (or you could average).
- */
+// ===========================================================================
+// 3) HELPER MAPS: LEVELS + PREREQS (for the original names).
+// ===========================================================================
 const rawCourseLevelMap = new Map([
-  // math
+  // MATH
   ["Algebra I", 4],
   ["Geometry, CP", 5],
   ["Geometry, Honors", 5],
@@ -155,7 +144,7 @@ const rawCourseLevelMap = new Map([
   ["AP Statistics", 9],
   ["SAT Math (Fall)/SAT Math (Spring)", 4],
 
-  // science
+  // SCIENCE + others
   ["Biology, CP", 3],
   ["Biology, Honors", 3],
   ["AP Biology", 4],
@@ -164,48 +153,35 @@ const rawCourseLevelMap = new Map([
   ["AP Chemistry", 4],
   ["Physics, CP/Honors", 3],
   ["AP Physics I", 4],
-  ["AP Environmental Science", 4],
-
-  // world lang
   ["Spanish I /Arabic I /Turkish I / Chinese I / French I (Independent Study with a Supervisor)", 1],
   ["Honors Spanish I", 2],
   ["Spanish II, Honors", 3],
   ["Spanish III, Honors", 4],
   ["Spanish IV, Honors", 5],
-
-  // social
   ["US History, CP", 3],
   ["US History, Honors", 3],
   ["AP US History", 4],
-
-  // cs
   ["Computer Programming I (Fall) / Computer Programming II (Spring)", 3],
   ["AP Computer Science A", 4],
   ["AP Computer Science Principles", 4],
+
+  // Additional from your snippet
+  ["Modern World History, CP", 4],
+  ["Modern World History, Honors", 5],
+  ["AP English Language & Composition", 5],
+  ["AP Psychology", 5],
+  ["AP Comparative Government and Politics", 5],
+  ["AP Macroeconomics", 5],
+  ["AP Microeconomics", 5],
+  ["AP US Government and Politics", 5],
+  ["AP European History", 5],
+  ["AP Environmental Science", 4],
+  ["AP Precalculus", 6],
+  ["Honors Probability & Statistics", 5],
 ]);
 
-// Build the unified courseLevelMap:
-const courseLevelMap = new Map();
-
-for (const [rawName, lvl] of rawCourseLevelMap.entries()) {
-  const unified = unifyNonAPName(rawName);
-  const existing = courseLevelMap.get(unified);
-  if (existing == null) {
-    courseLevelMap.set(unified, lvl);
-  } else {
-    // If CP/Honors unify to the same key, pick the max
-    courseLevelMap.set(unified, Math.max(existing, lvl));
-  }
-}
-
-/**
- * We do the same for prerequisitesMap, unifying keys and prerequisite entries.
- * Example:
- *  - "Geometry, CP" and "Geometry, Honors" both become "Geometry"
- *  - Then "Algebra I" stays "Algebra I" because it doesn't have “, CP” or “, Honors”
- *  - AP courses remain as is.
- */
-const rawPrerequisitesMap = new Map([
+// PREREQS: keyed by original name. 
+const rawPrereqMap = new Map([
   // MATH
   ["Geometry, CP", ["Algebra I"]],
   ["Geometry, Honors", ["Algebra I"]],
@@ -229,8 +205,14 @@ const rawPrerequisitesMap = new Map([
   ["AP Computer Science A", ["Computer Programming I (Fall) / Computer Programming II (Spring)"]],
   ["AP Computer Science Principles", ["Computer Programming I (Fall) / Computer Programming II (Spring)"]],
 
-  // Social/Econ
+  // Social
   ["AP US History", ["US History, CP", "US History, Honors"]],
+  ["AP US Government and Politics", ["Modern World History, Honors"]], // example if needed
+  ["AP Macroeconomics", []],
+  ["AP Microeconomics", []],
+  ["AP Psychology", []],
+  ["AP Comparative Government and Politics", []],
+  ["AP European History", []],
 
   // Language
   ["Spanish II, Honors", ["Spanish I"]],
@@ -240,62 +222,173 @@ const rawPrerequisitesMap = new Map([
   ["Arabic III & IV, Honors", ["Arabic II, CP"]],
 ]);
 
-const prerequisitesMap = new Map();
-
-// Function to unify each individual prerequisite name in the arrays
-function unifyPrereqList(rawPrereqs) {
-  return rawPrereqs.map((pr) => {
-    // Some prerequisites have multiple slash options, e.g. "Physics, CP/Honors"
-    // We'll unify each slice individually.
-    const chunks = pr.split("/");
-    return chunks
-      .map((piece) => unifyNonAPName(piece.trim()))
-      .join(" / ");
-  });
-}
-
-for (const [rawKey, rawValues] of rawPrerequisitesMap.entries()) {
-  const unifiedKey = unifyNonAPName(rawKey);
-  const unifiedVals = unifyPrereqList(rawValues);
-  // If we already have something for unifiedKey, merge them
-  if (!prerequisitesMap.has(unifiedKey)) {
-    prerequisitesMap.set(unifiedKey, unifiedVals);
-  } else {
-    // Merge arrays
-    const oldArray = prerequisitesMap.get(unifiedKey);
-    const newArray = [...oldArray, ...unifiedVals];
-    prerequisitesMap.set(unifiedKey, newArray);
+// ===========================================================================
+// 4) BUILD COURSE OBJECTS (with originalName + unifiedName).
+// ===========================================================================
+function getCategoryByName(originalName) {
+  const lower = originalName.toLowerCase();
+  if (
+    lower.includes("english 9") ||
+    lower.includes("english 10") ||
+    lower.includes("english 11") ||
+    lower.includes("english 12") ||
+    lower.includes("ap english language") ||
+    lower.includes("essay writing for seniors") ||
+    lower.includes("sat english")
+  ) {
+    return CourseCategory.ENGLISH;
   }
+  if (
+    lower.includes("algebra i") ||
+    lower.includes("algebra ii") ||
+    lower.includes("algebra 2") ||
+    lower.includes("geometry") ||
+    lower.includes("pre calculus") ||
+    lower.includes("precalculus") ||
+    lower.includes("ap precalculus") ||
+    lower.includes("honors precalculus") ||
+    lower.includes("calculus") ||
+    lower.includes("ap calculus") ||
+    lower.includes("statistics") ||
+    lower.includes("probability & statistics") ||
+    lower.includes("sat math")
+  ) {
+    return CourseCategory.MATH;
+  }
+  if (
+    lower.includes("biology") ||
+    lower.includes("chemistry") ||
+    lower.includes("physics") ||
+    lower.includes("anatomy and physiology") ||
+    lower.includes("environmental science") ||
+    lower.includes("forensic science") ||
+    lower.includes("organic chemistry")
+  ) {
+    return CourseCategory.SCIENCE;
+  }
+  if (
+    lower.includes("world history") ||
+    lower.includes("us history") ||
+    lower.includes("ap us government") ||
+    lower.includes("ap us history") ||
+    lower.includes("ap comparative government") ||
+    lower.includes("ap european history") ||
+    lower.includes("ap macroeconomics") ||
+    lower.includes("ap microeconomics") ||
+    lower.includes("ap psychology") ||
+    lower.includes("sociology") ||
+    lower.includes("global issues") ||
+    lower.includes("intro to world religions") ||
+    lower.includes("mythology") ||
+    lower.includes("cultural studies")
+  ) {
+    return CourseCategory.SOCIAL_STUDIES;
+  }
+  if (
+    lower.includes("financial literacy") ||
+    lower.includes("intro to business") ||
+    lower.includes("principles of business") ||
+    lower.includes("project management") ||
+    lower.includes("entrepreneurship") ||
+    lower.includes("marketing")
+  ) {
+    return CourseCategory.FINANCIAL;
+  }
+  if (lower.includes("pe/health")) {
+    return CourseCategory.PE_HEALTH;
+  }
+  if (
+    lower.includes("instrumental music") ||
+    lower.includes("pencil and ink illustration") ||
+    lower.includes("drawing and painting") ||
+    lower.includes("digital visual art") ||
+    lower.includes("cultivating creativity") ||
+    lower.includes("animated thinking")
+  ) {
+    return CourseCategory.VPA;
+  }
+  if (
+    lower.includes("spanish") ||
+    lower.includes("arabic") ||
+    lower.includes("turkish") ||
+    lower.includes("chinese") ||
+    lower.includes("french")
+  ) {
+    return CourseCategory.WL;
+  }
+  if (
+    lower.includes("national & international current affairs") ||
+    lower.includes("public speaking") ||
+    lower.includes("graphic design") ||
+    lower.includes("cybersecurity") ||
+    lower.includes("web development") ||
+    lower.includes("computer programming") ||
+    lower.includes("ap computer science") ||
+    lower.includes("dynamic programming") ||
+    lower.includes("principles of engineering") ||
+    lower.includes("architectural cad")
+  ) {
+    return CourseCategory.LIFE_CAREERS;
+  }
+  if (
+    lower.includes("broadcast media production") ||
+    lower.includes("juniors only") ||
+    lower.includes("seniors only independent online courses")
+  ) {
+    return CourseCategory.ELECTIVES;
+  }
+  return CourseCategory.ELECTIVES;
 }
 
-// Conflict set:
-const CONFLICT_BASES = new Set(["Biology", "Chemistry", "US History"]);
+/**
+ * Build a single course with:
+ * - name (e.g. "English 9, CP")
+ * - unifiedName (e.g. "English 9")
+ */
+function makeCourse(
+  originalName,
+  gpa,
+  diff,
+  rel,
+  period,
+  minG,
+  maxG,
+  isAP
+) {
+  const unified = unifyNonAPName(originalName);
+  const cat = getCategoryByName(originalName);
+  const lvl = rawCourseLevelMap.get(originalName) || 0;
 
-// ======================= 2) CORE LOGIC =======================
+  // unify the prerequisites
+  const rawPreArr = rawPrereqMap.get(originalName) || [];
+  const unifiedPrereqs = rawPreArr.map((r) => unifyNonAPName(r));
+
+  return {
+    name: originalName,         // keep CP/Honors in final
+    unifiedName: unified,       // stripped for logic
+    category: cat,
+    gpa,
+    difficulty: diff,
+    relevance: rel,
+    prerequisites: unifiedPrereqs,
+    period,
+    gradeLevelMin: minG,
+    gradeLevelMax: maxG,
+    isAP,
+    level: lvl,
+  };
+}
+
+// ===========================================================================
+// 5) BUILD THE FULL LIST OF COURSES  (from your snippet, no placeholders)
+// ===========================================================================
 function initAllCourses() {
   const list = [];
+  function helper(name, gpa, diff, rel, period, minG, maxG, ap) {
+    list.push(makeCourse(name, gpa, diff, rel, period, minG, maxG, ap));
+  }
 
-  // Helper function to add a course. We unify the name right at creation.
-  const helper = (originalName, gpa, diff, rel, period, minG, maxG, isAP) => {
-    const unifiedName = unifyNonAPName(originalName);
-    const cat = getCategoryByName(unifiedName);
-    const prereq = prerequisitesMap.get(unifiedName) || [];
-    const c = {
-      name: unifiedName,
-      category: cat,
-      gpa,
-      difficulty: diff,
-      relevance: rel,
-      prerequisites: prereq,
-      period,
-      gradeLevelMin: minG,
-      gradeLevelMax: maxG,
-      isAP,
-    };
-    list.push(c);
-  };
-
-  // ==================== Period 1 ====================
+  // Period 1
   helper("Biology, CP", 4.33, 4.5, 4.7, 1, 9, 12, false);
   helper("Geometry, Honors", 5.00, 2.6, 2.5, 1, 9, 12, false);
   helper("Instrumental Music I (Fall) / Instrumental Music II(Spring)", 4.00, 4.6, 2.4, 1, 9, 12, false);
@@ -312,7 +405,7 @@ function initAllCourses() {
   helper("AP Statistics", 5.33, 4.8, 5.0, 1, 10, 12, true);
   helper("Cybersecurity", 4.00, 4.5, 4.8, 1, 9, 12, false);
 
-  // ==================== Period 2 ====================
+  // Period 2
   helper("Algebra I", 4.00, 3.2, 3.8, 2, 9, 12, false);
   helper("Geometry, CP", 4.33, 3.5, 4.0, 2, 9, 12, false);
   helper("Graphic Design - Full Year", 4.00, 3.9, 4.2, 2, 9, 12, false);
@@ -328,7 +421,7 @@ function initAllCourses() {
   helper("Broadcast Media Production", 4.00, 3.7, 4.0, 2, 9, 12, false);
   helper("Dynamic Programming", 4.00, 4.8, 5.0, 2, 9, 12, false);
 
-  // ==================== Period 3 ====================
+  // Period 3
   helper("Spanish I /Arabic I /Turkish I / Chinese I / French I (Independent Study with a Supervisor)", 4.00, 3.2, 3.5, 3, 9, 12, false);
   helper("English 9, Honors", 5.00, 3.6, 4.5, 3, 9, 9, false);
   helper("Digital Visual Art (Fall) / Cultivating Creativity (Spring)", 4.00, 4.0, 3.7, 3, 9, 12, false);
@@ -345,7 +438,7 @@ function initAllCourses() {
   helper("Calculus", 4.00, 4.3, 4.7, 3, 9, 12, false);
   helper("AP Physics I", 5.33, 4.9, 5.0, 3, 10, 12, true);
 
-  // ==================== Period 4 ====================
+  // Period 4
   helper("US History, CP", 4.33, 3.7, 4.2, 4, 9, 12, false);
   helper("Biology, Honors", 5.00, 4.2, 4.8, 4, 9, 12, false);
   helper("PE/Health (Fall) / PE/Health (Spring)", 4.00, 2.9, 3.2, 4, 9, 12, false);
@@ -361,7 +454,7 @@ function initAllCourses() {
   helper("Intro to World Religions, Mythology, and Belief Systems I (Fall) / Intro to World Religions, Mythology, and Belief", 4.00, 3.7, 4.0, 4, 9, 12, false);
   helper("Sociology (Fall)/Anthropology(Spring)", 4.00, 4.0, 4.5, 4, 9, 12, false);
 
-  // ==================== Period 5 ====================
+  // Period 5
   helper("PE/Health (Fall) / PE/Health (Spring)", 4.00, 2.8, 3.2, 5, 9, 12, false);
   helper("English 9, Honors", 5.00, 3.5, 4.6, 5, 9, 9, false);
   helper("Pencil and Ink Illustration (Fall) / Drawing and Painting (Spring)", 4.00, 4.0, 3.5, 5, 9, 12, false);
@@ -378,7 +471,7 @@ function initAllCourses() {
   helper("AP Calculus AB", 5.33, 4.9, 5.0, 5, 10, 12, true);
   helper("Principles of Business (Fall)/ Project Management (Spring)", 4.00, 4.3, 4.6, 5, 9, 12, false);
 
-  // ==================== Period 7 ====================
+  // Period 7
   helper("English 9, CP", 4.33, 3.5, 4.0, 7, 9, 9, false);
   helper("US History, Honors", 5.00, 4.4, 5.0, 7, 9, 12, false);
   helper("Biology, Honors", 5.00, 4.3, 4.8, 7, 9, 12, false);
@@ -392,9 +485,9 @@ function initAllCourses() {
   helper("Principles of Engineering (Fall)\nArchitectural CAD (Spring)", 4.00, 4.5, 4.8, 7, 9, 12, false);
   helper("Environmental Science", 4.00, 3.8, 4.6, 7, 9, 12, false);
   helper("English 12, Honors", 5.00, 4.2, 4.8, 7, 12, 12, false);
-  helper("Honors Probability & Statistics", 5.00, 4.5, 4.6, 7, 9, 12, false); // Note: levelMap not configured
+  helper("Honors Probability & Statistics", 5.00, 4.5, 4.6, 7, 9, 12, false);
 
-  // ==================== Period 8 ====================
+  // Period 8
   helper("Digital Visual Art (Fall) / Animated Thinking (Spring)", 4.00, 3.9, 3.7, 8, 9, 12, false);
   helper("Instrumental Music I (Fall) / Instrumental Music II(Spring)", 4.00, 3.2, 3.0, 8, 9, 12, false);
   helper("Honors Spanish I", 5.00, 3.8, 4.5, 8, 9, 12, false);
@@ -412,511 +505,212 @@ function initAllCourses() {
   return list;
 }
 
-// getCategoryByName => same logic, but it will see the unified name now
-function getCategoryByName(name) {
-  if (
-    name.includes("English 9") ||
-    name.includes("English 10") ||
-    name.includes("English 11") ||
-    name.includes("English 12") ||
-    name.includes("AP English Language") ||
-    name.includes("Essay Writing for Seniors") ||
-    name.includes("SAT English")
-  ) {
-    return CourseCategory.ENGLISH;
-  }
-  if (
-    name.includes("Algebra I") ||
-    name.includes("Algebra II") ||
-    name.includes("Algebra 2") ||
-    name.includes("Geometry") ||
-    name.includes("Pre Calculus") ||
-    name.includes("Precalculus") ||
-    name.includes("Calculus") ||
-    name.includes("Statistics") ||
-    name.includes("SAT Math")
-  ) {
-    return CourseCategory.MATH;
-  }
-  if (
-    name.includes("Biology") ||
-    name.includes("Chemistry") ||
-    name.includes("Physics") ||
-    name.includes("Physiology") ||
-    name.includes("Environmental Science") ||
-    name.includes("Forensic Science") ||
-    name.includes("Organic Chemistry")
-  ) {
-    return CourseCategory.SCIENCE;
-  }
-  if (
-    name.includes("World History") ||
-    name.includes("US History") ||
-    name.includes("Government") ||
-    name.includes("Politics") ||
-    name.includes("Economics") ||
-    name.includes("Sociology") ||
-    name.includes("Global Issues") ||
-    name.includes("Mythology") ||
-    name.includes("Cultural Studies") ||
-    name.includes("Psychology")
-  ) {
-    return CourseCategory.SOCIAL_STUDIES;
-  }
-  if (
-    name.includes("Financial Literacy") ||
-    name.includes("Business") ||
-    name.includes("Marketing") ||
-    name.includes("Entrepreneurship")
-  ) {
-    return CourseCategory.FINANCIAL;
-  }
-  if (name.includes("PE/Health")) {
-    return CourseCategory.PE_HEALTH;
-  }
-  if (
-    name.includes("Instrumental Music") ||
-    name.includes("Pencil and Ink Illustration") ||
-    name.includes("Drawing and Painting") ||
-    name.includes("Digital Visual Art") ||
-    name.includes("Cultivating Creativity") ||
-    name.includes("Animated Thinking")
-  ) {
-    return CourseCategory.VPA;
-  }
-  if (
-    name.includes("Spanish") ||
-    name.includes("Arabic") ||
-    name.includes("Turkish") ||
-    name.includes("Chinese") ||
-    name.includes("French")
-  ) {
-    return CourseCategory.WL;
-  }
-  if (
-    name.includes("National & International Current Affairs") ||
-    name.includes("Public Speaking") ||
-    name.includes("Graphic Design") ||
-    name.includes("Cybersecurity") ||
-    name.includes("Web Development") ||
-    name.includes("Computer Programming") ||
-    name.includes("AP Computer Science") ||
-    name.includes("Dynamic Programming") ||
-    name.includes("Principles of Engineering") ||
-    name.includes("Architectural CAD")
-  ) {
-    return CourseCategory.LIFE_CAREERS;
-  }
-  if (
-    name.includes("Broadcast Media Production") ||
-    name.includes("Juniors Only") ||
-    name.includes("Seniors Only")
-  ) {
-    return CourseCategory.ELECTIVES;
-  }
-  return CourseCategory.ELECTIVES;
+const ALL = initAllCourses();
+
+// ===========================================================================
+// 6) UNIFY THE USER’S COMPLETED COURSES & FILTERING LOGIC
+// ===========================================================================
+function unifyCompletedCourses(userCompleted) {
+  return (userCompleted || []).map((c) => unifyNonAPName(c));
 }
 
-/**
- * Return a “base” like "Biology" or "US History" used for conflict detection.
- * Because we’ve already stripped “, CP” and “, Honors,”
- * your checks become simpler for non-AP courses.
- */
-function getBaseCourseName(name) {
-  return name
-    .replace("AP ", "")
-    .trim();
-}
-
-/**
- * We use our unified courseLevelMap to look up level.
- */
-function getLevel(courseName) {
-  return courseLevelMap.get(courseName) || 0;
-}
-
-/**
- * Are prerequisites met now uses the new (unified) name in prerequisitesMap.
- */
-function arePrerequisitesMet(course, completedSet) {
-  const prereqs = course.prerequisites || [];
-  if (prereqs.length === 0) return true;
-
-  const isMathCourse = course.category === CourseCategory.MATH;
-
-  // OR logic
-  let hasAnyPrereqSatisfied = false;
-  for (const pr of prereqs) {
-    // "Geometry / Algebra II" might have slash. We only need one to be satisfied.
-    const multipleOptions = pr.split("/");
-    let thisLineMet = false;
-    for (const singleOpt of multipleOptions) {
-      const so = singleOpt.trim();
-      if (isMathCourse) {
-        // math => same category + level >= needed
-        const needLvl = getLevel(so);
-        const needCat = getCategoryByName(so);
-        for (const comp of completedSet) {
-          const compLvl = getLevel(comp);
-          const compCat = getCategoryByName(comp);
-          if (compCat === needCat && compLvl >= needLvl) {
-            thisLineMet = true;
-            break;
-          }
-        }
-      } else {
-        // non-math => exact name match
-        // (We are storing unified names in completedSet.)
-        for (const comp of completedSet) {
-          if (comp.toLowerCase() === so.toLowerCase()) {
-            thisLineMet = true;
-            break;
-          }
-        }
-      }
-      if (thisLineMet) break;
-    }
-    if (thisLineMet) {
-      hasAnyPrereqSatisfied = true;
-      break;
-    }
-  }
-  return hasAnyPrereqSatisfied;
-}
-
-function getNonMathCategoryBase(courseName) {
-  if (courseName.includes("Biology")) return "Biology";
-  if (courseName.includes("Chemistry")) return "Chemistry";
-  if (courseName.includes("Physics")) return "Physics";
-  if (
-    courseName.includes("Spanish") ||
-    courseName.includes("Arabic") ||
-    courseName.includes("Turkish") ||
-    courseName.includes("Chinese") ||
-    courseName.includes("French")
-  ) {
-    return "WL";
-  }
-  if (courseName.includes("US History")) return "USHistory";
-  if (
-    courseName.includes("Computer Programming") ||
-    courseName.includes("Computer Science") ||
-    courseName.includes("Web Development")
-  ) {
-    return "CS";
-  }
-  return null;
-}
-
-/**
- * Filter out courses that are either completed, or don’t match grade, or for which
- * prerequisites aren’t met, or are not strictly higher-level than what the student already has.
- */
-function filterCourses(all, completedNames, grade, req, completedObjs) {
-  const completedSet = new Set(completedNames);
-
-  // Track if user has already done certain “base” courses
-  const completedBasesForConflict = new Set();
-  for (const cmpl of completedNames) {
-    if (cmpl.startsWith("AP ")) continue; // skip AP from base-conflict blocking
-    const base = getBaseCourseName(cmpl);
-    if (CONFLICT_BASES.has(base)) {
-      completedBasesForConflict.add(base);
-    }
-  }
-
-  // highest math level seen in completed
-  let highestMathLevel = 0;
-  for (const cmpl of completedNames) {
-    const cat = getCategoryByName(cmpl);
-    if (cat === CourseCategory.MATH) {
-      const lvl = getLevel(cmpl);
-      if (lvl > highestMathLevel) highestMathLevel = lvl;
-    }
-  }
-
-  // track highest for non-math categories with a “base”
-  const highestNonMathLevelMap = {};
-  for (const cmpl of completedNames) {
-    const nm = getNonMathCategoryBase(cmpl);
-    if (nm) {
-      const lvl = getLevel(cmpl);
-      highestNonMathLevelMap[nm] = Math.max(highestNonMathLevelMap[nm] || 0, lvl);
-    }
-  }
-
+// Filter courses: checks if the course is not already completed, no conflict, etc.
+function filterCourses(allCourses, completedUnifiedSet, grade, req) {
   const res = [];
-  for (const c of all) {
-    // skip if already completed
-    if (completedSet.has(c.name)) continue;
+  // Collect conflict base from user’s completed
+  const userConflictBases = new Set();
+  for (const unifiedName of completedUnifiedSet) {
+    const possiblyTrimmed = unifiedName.replace("AP ", "").trim();
+    if (CONFLICT_BASES.has(possiblyTrimmed)) {
+      userConflictBases.add(possiblyTrimmed);
+    }
+  }
 
-    // skip if conflict base is in completed
-    if (!c.isAP) {
-      const base = getBaseCourseName(c.name);
-      if (CONFLICT_BASES.has(base) && completedBasesForConflict.has(base)) {
+  // find highest math level
+  let highestMathLevel = 0;
+  for (const cName of completedUnifiedSet) {
+    const lvl = rawCourseLevelMap.get(cName) || 0;
+    const cat = getCategoryByName(cName);
+    if (cat === CourseCategory.MATH && lvl > highestMathLevel) {
+      highestMathLevel = lvl;
+    }
+  }
+
+  for (const course of allCourses) {
+    // skip if user completed (by unifiedName)
+    if (completedUnifiedSet.has(course.unifiedName)) continue;
+
+    // skip conflict if not AP
+    if (!course.isAP) {
+      const base = unifyNonAPName(course.unifiedName.replace("AP ", ""));
+      if (CONFLICT_BASES.has(base) && userConflictBases.has(base)) {
         continue;
       }
     }
 
-    // grade check
-    if (grade < c.gradeLevelMin || grade > c.gradeLevelMax) continue;
-
-    // prereqs?
-    if (!arePrerequisitesMet(c, completedSet)) continue;
-
-    // MATH => must be strictly higher than highest completed
-    if (c.category === CourseCategory.MATH) {
-      const cLevel = getLevel(c.name);
-      if (cLevel <= highestMathLevel) continue;
-    } else {
-      const nm = getNonMathCategoryBase(c.name);
-      if (nm) {
-        const cLevel = getLevel(c.name);
-        const maxLvl = highestNonMathLevelMap[nm] || 0;
-        if (cLevel <= maxLvl) continue;
-      }
+    // check grade
+    if (grade < course.gradeLevelMin || grade > course.gradeLevelMax) {
+      continue;
     }
 
-    res.push(c);
+    // check prerequisites
+    if (!arePrerequisitesMet(course, completedUnifiedSet)) {
+      continue;
+    }
+
+    // if math => strictly higher level
+    if (course.category === CourseCategory.MATH) {
+      if (course.level <= highestMathLevel) {
+        continue;
+      }
+    }
+    res.push(course);
   }
   return res;
 }
 
-function mergePlansByPeriod(plans) {
-  // Group by mathEnglishCombo
-  const groups = new Map();
-  for (const plan of plans) {
-    const key = plan.mathEnglishCombo;
-    if (!groups.has(key)) {
-      groups.set(key, []);
+function arePrerequisitesMet(course, completedUnifiedSet) {
+  if (!course.prerequisites || !course.prerequisites.length) return true;
+  // OR logic if you have slashes. In this example, each requirement is a single string.
+  // If you need slash combos, parse them. Otherwise:
+  let matchedAny = false;
+  for (const pr of course.prerequisites) {
+    // If the user has this unifiedName in completedUnifiedSet, that's good
+    if (completedUnifiedSet.has(pr)) {
+      matchedAny = true;
+      break;
     }
-    groups.get(key).push(plan);
   }
-
-  const mergedResults = [];
-  for (const [combo, comboPlans] of groups.entries()) {
-    const periodMap = new Map();
-    for (const plan of comboPlans) {
-      for (const p of plan.periods) {
-        if (!periodMap.has(p.period)) {
-          periodMap.set(p.period, new Set());
-        }
-        for (const cname of p.courseNames) {
-          periodMap.get(p.period).add(cname);
-        }
-      }
-    }
-
-    const mergedPeriods = [];
-    const sortedPeriods = Array.from(periodMap.keys()).sort((a, b) => a - b);
-    for (const period of sortedPeriods) {
-      const courseArr = Array.from(periodMap.get(period)).sort();
-      mergedPeriods.push({ period, courseNames: courseArr });
-    }
-
-    mergedResults.push({
-      mathEnglishCombo: combo,
-      periods: mergedPeriods,
-    });
-  }
-
-  return mergedResults;
+  // Some courses might have multiple prereq lines that should be satisfied with OR logic. 
+  // If your list means AND, adapt accordingly.
+  return course.prerequisites.length ? matchedAny : true;
 }
 
-function generateAllPossiblePlans(periodMap, grade) {
-  if (!periodMap || Object.keys(periodMap).length === 0) {
-    return [];
-  }
-  const periods = Object.keys(periodMap)
-    .map((n) => parseInt(n, 10))
-    .sort((a, b) => a - b);
+// Generate all combos
+function generateAllPossiblePlans(periodMap) {
+  const periods = Object.keys(periodMap).map(Number).sort((a, b) => a - b);
+  const results = [];
 
-  const result = [];
   function backtrack(idx, current) {
     if (idx === periods.length) {
-      result.push([...current]);
+      results.push([...current]);
       return;
     }
     const p = periods[idx];
     const candidates = periodMap[p] || [];
-    if (candidates.length === 0) return;
     for (const c of candidates) {
       current.push(c);
-      if (partialCheckPlan(current, grade, idx, periods, periodMap)) {
+      if (checkNoDuplicateUnified(current)) {
         backtrack(idx + 1, current);
       }
       current.pop();
     }
   }
   backtrack(0, []);
-  return result;
+  return results;
 }
 
-function partialCheckPlan(plan, grade, idx, periods, periodMap) {
-  if (!checkNoDuplicateCourse(plan)) return false;
-  if (!checkCourseLevelVariants(plan)) return false;
-  // If grade=10 => must have "English 10" somewhere in final
-  if (grade === 10) {
-    const hasEnglish10 = plan.some(
-      (c) => c.category === CourseCategory.ENGLISH && c.name.includes("English 10"),
-    );
-    if (!hasEnglish10) {
-      let possibleInFuture = false;
-      for (let i = idx + 1; i < periods.length; i++) {
-        const p = periods[i];
-        const future = periodMap[p] || [];
-        if (future.some(
-          (cc) => cc.category === CourseCategory.ENGLISH && cc.name.includes("English 10"),
-        )) {
-          possibleInFuture = true;
-          break;
-        }
-      }
-      if (!possibleInFuture) return false;
-    }
+function checkNoDuplicateUnified(plan) {
+  const set = new Set();
+  for (const c of plan) {
+    if (set.has(c.unifiedName)) return false;
+    set.add(c.unifiedName);
   }
   return true;
 }
 
 function isFeasible(plan, grade) {
-  if (!checkNoDuplicateCourse(plan)) return false;
-  if (!checkCourseLevelVariants(plan)) return false;
-
-  // exactly 1 MATH + exactly 1 ENGLISH
-  const mathList = plan.filter((c) => c.category === CourseCategory.MATH);
-  const engList = plan.filter((c) => c.category === CourseCategory.ENGLISH);
-  if (mathList.length !== 1) return false;
-  if (engList.length !== 1) return false;
+  // must have exactly 1 math, 1 english
+  const math = plan.filter((c) => c.category === CourseCategory.MATH);
+  const eng = plan.filter((c) => c.category === CourseCategory.ENGLISH);
+  if (math.length !== 1 || eng.length !== 1) return false;
 
   // correct grade-level English
-  let hasEnglishForGrade = false;
-  for (const c of plan) {
-    if (c.category === CourseCategory.ENGLISH) {
-      if (grade === 9 && c.name.includes("English 9")) hasEnglishForGrade = true;
-      if (grade === 10 && c.name.includes("English 10")) hasEnglishForGrade = true;
-      if (grade === 11 && (c.name.includes("English 11") || c.name.includes("AP English"))) {
-        hasEnglishForGrade = true;
-      }
-      if (grade === 12 && (c.name.includes("English 12") || c.name.includes("AP English"))) {
-        hasEnglishForGrade = true;
-      }
+  let validEnglish = false;
+  for (const e of eng) {
+    if (grade === 9 && e.name.includes("English 9")) validEnglish = true;
+    if (grade === 10 && e.name.includes("English 10")) validEnglish = true;
+    if (grade === 11 && (e.name.includes("English 11") || e.name.includes("AP English"))) {
+      validEnglish = true;
+    }
+    if (grade === 12 && (e.name.includes("English 12") || e.name.includes("AP English"))) {
+      validEnglish = true;
     }
   }
-  if (!hasEnglishForGrade) return false;
-
-  return true;
-}
-
-function checkNoDuplicateCourse(plan) {
-  const bases = new Set();
-  for (const c of plan) {
-    if (c.category === CourseCategory.FREE_PERIOD) continue;
-    const base = getBaseCourseName(c.name);
-    if (bases.has(base)) return false;
-    bases.add(base);
-  }
-  return true;
-}
-
-function checkCourseLevelVariants(plan) {
-  const catMaxLvl = new Map();
-  for (const c of plan) {
-    if (c.category === CourseCategory.FREE_PERIOD) continue;
-    const lvl = getLevel(c.name);
-    const old = catMaxLvl.get(c.category) || 0;
-    if (lvl > old) catMaxLvl.set(c.category, lvl);
-  }
-  for (const c of plan) {
-    if (c.category === CourseCategory.FREE_PERIOD) continue;
-    const lvl = getLevel(c.name);
-    const maxLvl = catMaxLvl.get(c.category) || 0;
-    if (lvl < maxLvl) return false;
-  }
-  return true;
+  return validEnglish;
 }
 
 function averageGPA(plan) {
-  let sum = 0;
-  let count = 0;
+  let sum = 0, count = 0;
   for (const c of plan) {
-    if (c.category !== CourseCategory.FREE_PERIOD) {
-      sum += c.gpa;
-      count++;
-    }
+    sum += c.gpa;
+    count++;
   }
   return count === 0 ? 0 : sum / count;
 }
 
 function averageDifficulty(plan) {
-  let sum = 0;
-  let count = 0;
+  let sum = 0, count = 0;
   for (const c of plan) {
-    if (c.category !== CourseCategory.FREE_PERIOD) {
-      sum += c.difficulty;
-      count++;
-    }
+    sum += c.difficulty;
+    count++;
   }
   return count === 0 ? 0 : sum / count;
 }
 
 function getHighestGPAPlans(feasible) {
-  let maxGPA = -1;
+  let max = -1;
   for (const plan of feasible) {
     const g = averageGPA(plan);
-    if (g > maxGPA) maxGPA = g;
+    if (g > max) max = g;
   }
-  return feasible.filter((p) => Math.abs(averageGPA(p) - maxGPA) < 1e-9);
+  return feasible.filter((p) => Math.abs(averageGPA(p) - max) < 1e-9);
 }
 
 function getEasiestPlans(feasible) {
-  let minDiff = Infinity;
+  let min = Infinity;
   for (const plan of feasible) {
     const d = averageDifficulty(plan);
-    if (d < minDiff) minDiff = d;
+    if (d < min) min = d;
   }
-  return feasible.filter((p) => Math.abs(averageDifficulty(p) - minDiff) < 1e-9);
+  return feasible.filter((p) => Math.abs(averageDifficulty(p) - min) < 1e-9);
 }
 
-/**
- * "Most relevant plan": for each period, choose the highest relevance courses that match the major.
- * This yields a single “plan” in a period-by-period sense.
- */
+// For "most relevant," pick highest relevance in major
 function getMostRelevantPlan(feasible, direction) {
-  const periodMap = {};
+  const periodSet = new Set();
   for (const plan of feasible) {
-    for (const c of plan) {
-      if (!periodMap[c.period]) periodMap[c.period] = new Set();
-      periodMap[c.period].add(c);
-    }
+    plan.forEach((c) => periodSet.add(c.period));
   }
+  const sorted = [...periodSet].sort((a, b) => a - b);
+
   const result = [];
-  const sortedPeriods = Object.keys(periodMap).map((x) => parseInt(x, 10)).sort((a, b) => a - b);
-  for (const p of sortedPeriods) {
-    let candidates = Array.from(periodMap[p]);
-    // remove FREE_PERIOD
-    candidates = candidates.filter((c) => c.category !== CourseCategory.FREE_PERIOD);
-    if (candidates.length === 0) {
-      result.push({ period: p, courseNames: ["<<<FREE>>>"] });
-      continue;
+  for (const p of sorted) {
+    let cands = [];
+    for (const plan of feasible) {
+      const found = plan.filter((cc) => cc.period === p);
+      cands.push(...found);
     }
-    // keep only those in major
-    candidates = candidates.filter((c) => isCourseInMajor(direction, c));
-    if (candidates.length === 0) {
+    cands = [...new Set(cands)]; // unique objects
+
+    // filter to major
+    cands = cands.filter((c) => isCourseInMajor(direction, c));
+    if (!cands.length) {
       result.push({ period: p, courseNames: ["<<<FREE>>>"] });
       continue;
     }
     let maxRel = -1;
-    for (const c of candidates) {
+    for (const c of cands) {
       if (c.relevance > maxRel) maxRel = c.relevance;
     }
-    const best = candidates.filter((cc) => Math.abs(cc.relevance - maxRel) < 1e-9);
-    const names = best.map((b) => b.name);
-    result.push({ period: p, courseNames: names });
+    const best = cands.filter((c) => Math.abs(c.relevance - maxRel) < 1e-9);
+    result.push({ period: p, courseNames: best.map((b) => b.name) });
   }
   return result;
 }
 
 function isCourseInMajor(directionStr, c) {
+  // same logic from your snippet
   switch (directionStr) {
     case "STEM":
       return (
@@ -931,21 +725,13 @@ function isCourseInMajor(directionStr, c) {
       return false;
     case "BUSINESS":
       if (c.category === CourseCategory.FINANCIAL) return true;
-      if (
-        c.name.includes("Business") ||
-        c.name.includes("Marketing") ||
-        c.name.includes("Economics")
-      ) {
+      if (c.name.includes("Business") || c.name.includes("Marketing") || c.name.includes("Economics")) {
         return true;
       }
       return false;
     case "SOCIAL_SCIENCE":
       if (c.category === CourseCategory.SOCIAL_STUDIES) return true;
-      if (
-        c.name.includes("Sociology") ||
-        c.name.includes("Anthropology") ||
-        c.name.includes("Psychology")
-      ) {
+      if (c.name.includes("Sociology") || c.name.includes("Anthropology") || c.name.includes("Psychology")) {
         return true;
       }
       return false;
@@ -991,58 +777,98 @@ function isCourseInMajor(directionStr, c) {
   }
 }
 
-/** Transform an array of plan arrays into JSON-friendly plan objects. */
+// transform plan => { mathEnglishCombo, periods: [ {period, courseNames[]} ] }
 function transformPlanList(planList) {
-  const result = [];
+  const out = [];
   for (const plan of planList) {
-    const periods = new Set(plan.map((c) => c.period));
-    const sortedPeriods = Array.from(periods).sort((a, b) => a - b);
-    const periodOutputs = [];
-    for (const p of sortedPeriods) {
-      const coursesInPeriod = plan.filter((c) => c.period === p).map((c) => c.name);
-      periodOutputs.push({ period: p, courseNames: coursesInPeriod });
-    }
+    // find the single math & english
     const math = plan.find((c) => c.category === CourseCategory.MATH) || { name: "None" };
     const eng = plan.find((c) => c.category === CourseCategory.ENGLISH) || { name: "None" };
     const comboName = `${math.name} & ${eng.name}`;
-    result.push({
+    // group by period
+    const periodMap = {};
+    for (const c of plan) {
+      if (!periodMap[c.period]) {
+        periodMap[c.period] = [];
+      }
+      periodMap[c.period].push(c.name);
+    }
+    const sortedPeriods = Object.keys(periodMap).map(Number).sort((a, b) => a - b);
+    const periodOutputs = sortedPeriods.map((p) => ({
+      period: p,
+      courseNames: periodMap[p],
+    }));
+    out.push({
       mathEnglishCombo: comboName,
       periods: periodOutputs,
     });
   }
-  return result;
+  return out;
 }
 
-// ======================= 3) BUILD THE "ALL_COURSES" ONCE =======================
-const ALL = initAllCourses();
+// Merge multiple plan objects that share the same mathEnglishCombo
+function mergePlansByPeriod(planJSON) {
+  const map = new Map();
+  for (const p of planJSON) {
+    const key = p.mathEnglishCombo;
+    if (!map.has(key)) {
+      map.set(key, []);
+    }
+    map.get(key).push(p);
+  }
+  const merged = [];
+  for (const [combo, arr] of map.entries()) {
+    const periodMap = new Map();
+    for (const item of arr) {
+      for (const pr of item.periods) {
+        if (!periodMap.has(pr.period)) {
+          periodMap.set(pr.period, new Set());
+        }
+        pr.courseNames.forEach((cn) => periodMap.get(pr.period).add(cn));
+      }
+    }
+    const sortedP = [...periodMap.keys()].sort((a, b) => a - b);
+    const newPeriods = sortedP.map((pp) => ({
+      period: pp,
+      courseNames: [...periodMap.get(pp)].sort(),
+    }));
+    merged.push({
+      mathEnglishCombo: combo,
+      periods: newPeriods,
+    });
+  }
+  return merged;
+}
 
-// ======================= 4) MAIN ENDPOINT: /api/curriculum/plan =======================
+// ===========================================================================
+// 7) MAIN ENDPOINT: /api/curriculum/plan
+// ===========================================================================
 app.post("/api/curriculum/plan", (req, res) => {
   const { grade, completedCourses, majorDirectionCode } = req.body;
 
-  // 1) unify all completedCourses the same way
-  const completedUnified = (completedCourses || []).map((n) => unifyNonAPName(n));
-  // find the Course objects for them
-  const completedCourseObjs = ALL.filter((c) => completedUnified.includes(c.name));
+  // unify completed courses
+  const completedUnified = unifyCompletedCourses(completedCourses);
 
-  // 2) update requirements
+  // build completed courseObjs for graduation logic
+  const completedCourseObjs = ALL.filter((c) => completedUnified.includes(c.unifiedName));
+
+  // update Grad Reqs
   const reqs = new GraduationRequirements();
   reqs.updateRequirements(completedCourseObjs);
 
-  // 3) how many PE Health completed
-  const completedPECount = completedCourseObjs.filter((c) => c.category === CourseCategory.PE_HEALTH).length;
+  // filter out
+  const filtered = filterCourses(ALL, new Set(completedUnified), grade || 9, reqs);
 
-  // 4) filter courses
-  const filtered = filterCourses(ALL, completedUnified, grade || 9, reqs, completedCourseObjs);
-  // skip more PE if user already has 2
+  // e.g., skip more PE if done 2+ times
+  const userPECount = completedCourseObjs.filter((c) => c.category === CourseCategory.PE_HEALTH).length;
   const finalFiltered = filtered.filter((c) => {
     if (c.category === CourseCategory.PE_HEALTH) {
-      return completedPECount < 2;
+      return userPECount < 2;
     }
     return true;
   });
 
-  // group by period -> all possible combos
+  // group -> generate
   const periodMap = {};
   for (const c of finalFiltered) {
     if (!periodMap[c.period]) {
@@ -1050,16 +876,16 @@ app.post("/api/curriculum/plan", (req, res) => {
     }
     periodMap[c.period].push(c);
   }
+  const allPlans = generateAllPossiblePlans(periodMap);
 
-  const allPlans = generateAllPossiblePlans(periodMap, grade);
-  const feasiblePlans = [];
+  const feasible = [];
   for (const plan of allPlans) {
     if (isFeasible(plan, grade)) {
-      feasiblePlans.push(plan);
+      feasible.push(plan);
     }
   }
 
-  if (feasiblePlans.length === 0) {
+  if (!feasible.length) {
     return res.json({
       highestGpaPlans: [],
       mostRelevantPlan: [],
@@ -1069,31 +895,28 @@ app.post("/api/curriculum/plan", (req, res) => {
 
   const directionStr = fromCode(majorDirectionCode || 1);
 
-  const highestGPA = getHighestGPAPlans(feasiblePlans);
-  const easiest = getEasiestPlans(feasiblePlans);
-  const mostRelevant = getMostRelevantPlan(feasiblePlans, directionStr);
+  // Summaries
+  const highest = getHighestGPAPlans(feasible);
+  const easiest = getEasiestPlans(feasible);
+  const mr = getMostRelevantPlan(feasible, directionStr);
 
-  const highestGpaPlansRaw = transformPlanList(highestGPA);
-  const highestGpaPlans = mergePlansByPeriod(highestGpaPlansRaw);
-  const easiestPlansRaw = transformPlanList(easiest);
-  const easiestPlans = mergePlansByPeriod(easiestPlansRaw);
+  // transform
+  const highestRaw = transformPlanList(highest);
+  const highestGpaPlans = mergePlansByPeriod(highestRaw);
+
+  const easiestRaw = transformPlanList(easiest);
+  const easiestPlans = mergePlansByPeriod(easiestRaw);
 
   return res.json({
     highestGpaPlans,
-    mostRelevantPlan: mostRelevant,
+    mostRelevantPlan: mr,
     easiestPlans,
   });
 });
 
-// ======================= 5) SERVE REACT IN PRODUCTION =======================
-if (process.env.NODE_ENV === "production") {
-  app.use(express.static(path.join(__dirname, "..", "build")));
-  app.get("*", (req, res) => {
-    res.sendFile(path.join(__dirname, "..", "build", "index.html"));
-  });
-}
-
-// ======================= 6) START SERVER =======================
+// ===========================================================================
+// 8) START SERVER
+// ===========================================================================
 app.listen(PORT, () => {
   console.log(`Server listening on port ${PORT}...`);
 });

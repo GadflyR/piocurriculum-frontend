@@ -1,20 +1,48 @@
 import React, { useState, useEffect } from "react";
 import { Accordion, Form, Row, Col, Button, ProgressBar, Card, Alert } from "react-bootstrap";
-import { generatePlan } from "../services/curriculumService.js";
-import { groupCoursesBySubject } from "../utils/groupCoursesBySubject.js";
-import { ALL_COURSES } from "../utils/courseData.js";
+import { generatePlan } from "../services/curriculumService";
+import { ALL_COURSES } from "../utils/courseData";
 
-const MAJOR_DIRECTIONS = [
-  { code: 1, label: "STEM" },
-  { code: 2, label: "MEDICAL" },
-  { code: 3, label: "BUSINESS" },
-  { code: 4, label: "SOCIAL_SCIENCE" },
-  { code: 5, label: "ENVIRONMENTAL" },
-  { code: 6, label: "CS_DATA" },
-  { code: 7, label: "LANGUAGE_CULTURE" },
-  { code: 8, label: "LAW_POLICY" },
-];
+// Utility to unify "CP/Honors"
+function unifyNonAPName(name) {
+  if (name.includes("AP ")) return name.trim();
+  return name
+    .replace("CP/Honors", "")
+    .replace(", CP", "")
+    .replace(", Honors", "")
+    .trim();
+}
 
+// Group courses by subject: we store them in a map, but unify CP/Honors keys
+function groupCoursesBySubjectUnified(courses) {
+  const subjectMap = {};
+  for (const c of courses) {
+    // c is presumably the raw original name from your data
+    // unify it
+    const unified = unifyNonAPName(c);
+    // then figure out subject
+    // For simplicity, let's guess subject by partial keywords
+    let subject = "Other";
+    if (unified.toLowerCase().includes("english")) subject = "English";
+    else if (unified.toLowerCase().includes("algebra") || unified.toLowerCase().includes("geometry") || unified.toLowerCase().includes("calculus")) {
+      subject = "Math";
+    }
+    // etc. (Fill in your logic)
+    if (!subjectMap[subject]) {
+      subjectMap[subject] = new Set();
+    }
+    // store the unified name in that set
+    subjectMap[subject].add(unified);
+  }
+  // convert each set to sorted array
+  const result = {};
+  for (const subj in subjectMap) {
+    result[subj] = Array.from(subjectMap[subj]).sort();
+  }
+  return result;
+}
+
+// We define the subject order for the UI
 const SUBJECT_ORDER = [
   "English",
   "Math",
@@ -27,30 +55,10 @@ const SUBJECT_ORDER = [
   "Other",
 ];
 
-// (Optional) subtle color for each period
-const PERIOD_COLORS = {
-  1: "#f9f9f9",
-  2: "#f2f2f2",
-  3: "#efefef",
-  4: "#eaeaea",
-  5: "#e5e5e5",
-  6: "#e0e0e0",
-  7: "#dbdbdb",
-  8: "#d6d6d6",
-};
-
-// Helper function to chunk an array into smaller arrays of a specified size
-const chunkArray = (array, size) => {
-  const chunkedArray = [];
-  for (let i = 0; i < array.length; i += size) {
-    chunkedArray.push(array.slice(i, i + size));
-  }
-  return chunkedArray;
-};
-
 const CurriculumForm = () => {
   const [grade, setGrade] = useState(9);
   const [majorDirection, setMajorDirection] = useState(1);
+  // Here we store "unified" names in completedCourses
   const [completedCourses, setCompletedCourses] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState(null);
@@ -59,20 +67,22 @@ const CurriculumForm = () => {
   const [coursesBySubject, setCoursesBySubject] = useState({});
 
   useEffect(() => {
-    const grouped = groupCoursesBySubject(ALL_COURSES);
+    // Suppose ALL_COURSES is your array of original course names:
+    // e.g. ["English 9, CP", "English 9, Honors", "AP English Lit", ...]
+    // We'll unify them for display so CP/Honors appear as a single checkbox.
+    const grouped = groupCoursesBySubjectUnified(ALL_COURSES);
     setCoursesBySubject(grouped);
   }, []);
 
-  // Toggle a course in the completedCourses array
-  const handleCourseToggle = (courseName) => {
+  const handleCourseToggle = (unifiedName) => {
+    // If user toggles "English 9," we store "English 9" in completedCourses
     setCompletedCourses((prev) =>
-      prev.includes(courseName)
-        ? prev.filter((c) => c !== courseName)
-        : [...prev, courseName]
+      prev.includes(unifiedName)
+        ? prev.filter((c) => c !== unifiedName)
+        : [...prev, unifiedName]
     );
   };
 
-  // Submit the form to generate the plan
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
@@ -81,28 +91,27 @@ const CurriculumForm = () => {
 
     const payload = {
       grade: parseInt(grade, 10),
-      completedCourses,
+      // We directly send the unified names to the backend
+      // The backend's unifyCompletedCourses() won't break anything,
+      // but it effectively sees them as already unified.
+      completedCourses: completedCourses,
       majorDirectionCode: parseInt(majorDirection, 10),
     };
 
     try {
       const data = await generatePlan(payload);
       setResult(data);
-    } catch (error) {
-      console.error("Error generating plan:", error);
+    } catch (err) {
+      console.error("Error generating plan:", err);
       setError("Failed to generate plan. Please try again.");
     } finally {
       setIsLoading(false);
     }
   };
 
-  const getPeriodColor = (period) => {
-    return PERIOD_COLORS[period] || "#f7f7f7";
-  };
-
   return (
-    <div className="container mt-4" style={{ fontSize: "1.02rem" }}>
-      <h2 className="mb-3">Curriculum Planner</h2>
+    <div className="container mt-4">
+      <h2>Curriculum Planner</h2>
 
       <Form onSubmit={handleSubmit}>
         <Row className="mb-3">
@@ -127,49 +136,45 @@ const CurriculumForm = () => {
                 value={majorDirection}
                 onChange={(e) => setMajorDirection(e.target.value)}
               >
-                {MAJOR_DIRECTIONS.map((dir) => (
-                  <option key={dir.code} value={dir.code}>
-                    {dir.code} - {dir.label}
-                  </option>
-                ))}
+                <option value="1">1 - STEM</option>
+                <option value="2">2 - MEDICAL</option>
+                <option value="3">3 - BUSINESS</option>
+                <option value="4">4 - SOCIAL_SCIENCE</option>
+                <option value="5">5 - ENVIRONMENTAL</option>
+                <option value="6">6 - CS_DATA</option>
+                <option value="7">7 - LANGUAGE_CULTURE</option>
+                <option value="8">8 - LAW_POLICY</option>
               </Form.Select>
             </Form.Group>
           </Col>
         </Row>
 
         <div className="mb-3">
-          <p>Please select any courses you've taken in the past:</p>
+          <p>
+            Please select any courses you've taken in the past. Honors/CP are
+            merged into one label (e.g., "English 9").
+          </p>
         </div>
 
-        {/* Use an Accordion, but chunk each subject's courses into columns */}
         <Accordion alwaysOpen className="mb-3">
-          {SUBJECT_ORDER.map((subj, index) => {
-            const coursesInSubject = coursesBySubject[subj] || [];
-            if (!coursesInSubject.length) return null;
-
-            // Adjust the chunk size below to control how many courses per column
-            const chunkedCourses = chunkArray(coursesInSubject, 6);
+          {SUBJECT_ORDER.map((subj, idx) => {
+            const unifiedArray = coursesBySubject[subj] || [];
+            if (!unifiedArray.length) return null;
 
             return (
-              <Accordion.Item eventKey={String(index)} key={subj}>
+              <Accordion.Item eventKey={String(idx)} key={subj}>
                 <Accordion.Header>{subj}</Accordion.Header>
                 <Accordion.Body>
-                  <Row>
-                    {chunkedCourses.map((courseChunk, chunkIndex) => (
-                      <Col md={4} key={`${subj}-chunk-${chunkIndex}`}>
-                        {courseChunk.map((course) => (
-                          <Form.Check
-                            key={course}
-                            type="checkbox"
-                            label={course}
-                            checked={completedCourses.includes(course)}
-                            onChange={() => handleCourseToggle(course)}
-                            className="mb-2"
-                          />
-                        ))}
-                      </Col>
-                    ))}
-                  </Row>
+                  {unifiedArray.map((unifiedName) => (
+                    <Form.Check
+                      key={unifiedName}
+                      type="checkbox"
+                      label={unifiedName}
+                      checked={completedCourses.includes(unifiedName)}
+                      onChange={() => handleCourseToggle(unifiedName)}
+                      className="mb-2"
+                    />
+                  ))}
                 </Accordion.Body>
               </Accordion.Item>
             );
@@ -179,13 +184,13 @@ const CurriculumForm = () => {
         <Button type="submit" variant="primary" disabled={isLoading}>
           Generate Plan
         </Button>
-
-        {isLoading && (
-          <div className="mt-3">
-            <ProgressBar animated now={100} label="Generating..." />
-          </div>
-        )}
       </Form>
+
+      {isLoading && (
+        <div className="mt-3">
+          <ProgressBar animated now={100} label="Generating..." />
+        </div>
+      )}
 
       {error && (
         <Alert variant="danger" className="mt-3">
@@ -196,29 +201,19 @@ const CurriculumForm = () => {
       {result && !isLoading && (
         <div className="mt-5">
           <h3>Results</h3>
-
-          {/* Highest GPA Plans */}
+          {/* Example output for highest/easiest/most relevant */}
           <div className="mb-4">
-            <h4 style={{ fontSize: "1.15rem" }}>Highest GPA Plans</h4>
+            <h4>Highest GPA Plans</h4>
             {result.highestGpaPlans?.length ? (
-              result.highestGpaPlans.map((plan, idx) => (
-                <Card key={idx} className="mb-3">
-                  <Card.Header style={{ backgroundColor: "#fafafa" }}>
-                    <strong>Math &amp; English combo:</strong> {plan.mathEnglishCombo}
+              result.highestGpaPlans.map((plan, i) => (
+                <Card key={i} className="mb-3">
+                  <Card.Header>
+                    <strong>{plan.mathEnglishCombo}</strong>
                   </Card.Header>
                   <Card.Body>
                     {plan.periods.map((p) => (
-                      <div
-                        key={p.period}
-                        style={{
-                          backgroundColor: getPeriodColor(p.period),
-                          padding: "0.5rem",
-                          marginBottom: "0.5rem",
-                          borderRadius: "3px",
-                        }}
-                      >
-                        <strong>Period {p.period}:</strong>{" "}
-                        {p.courseNames.join(", ")}
+                      <div key={p.period}>
+                        <strong>Period {p.period}:</strong> {p.courseNames.join(", ")}
                       </div>
                     ))}
                   </Card.Body>
@@ -229,27 +224,16 @@ const CurriculumForm = () => {
             )}
           </div>
 
-          {/* Most Relevant Plan */}
           <div className="mb-4">
-            <h4 style={{ fontSize: "1.15rem" }}>Most Relevant Plan (by period)</h4>
+            <h4>Most Relevant Plan</h4>
             {result.mostRelevantPlan?.length ? (
-              <Card className="mb-3">
-                <Card.Header style={{ backgroundColor: "#fafafa" }}>
-                  <strong>Most Relevant Courses</strong>
-                </Card.Header>
+              <Card>
+                <Card.Header>Most Relevant</Card.Header>
                 <Card.Body>
-                  {result.mostRelevantPlan.map((p, idx) => (
-                    <div
-                      key={idx}
-                      style={{
-                        backgroundColor: getPeriodColor(p.period),
-                        padding: "0.5rem",
-                        marginBottom: "0.5rem",
-                        borderRadius: "3px",
-                      }}
-                    >
-                      <strong>Period {p.period}:</strong> {p.courseNames.join(", ")}
-                    </div>
+                  {result.mostRelevantPlan.map((r, idx) => (
+                    <p key={idx}>
+                      <strong>Period {r.period}:</strong> {r.courseNames.join(", ")}
+                    </p>
                   ))}
                 </Card.Body>
               </Card>
@@ -258,29 +242,18 @@ const CurriculumForm = () => {
             )}
           </div>
 
-          {/* Easiest Plans */}
           <div className="mb-4">
-            <h4 style={{ fontSize: "1.15rem" }}>Easiest Plans</h4>
+            <h4>Easiest Plans</h4>
             {result.easiestPlans?.length ? (
-              result.easiestPlans.map((plan, idx) => (
-                <Card key={idx} className="mb-3">
-                  <Card.Header style={{ backgroundColor: "#fafafa" }}>
-                    <strong>Math &amp; English combo:</strong>{" "}
-                    {plan.mathEnglishCombo}
+              result.easiestPlans.map((plan, i) => (
+                <Card key={i} className="mb-3">
+                  <Card.Header>
+                    <strong>{plan.mathEnglishCombo}</strong>
                   </Card.Header>
                   <Card.Body>
                     {plan.periods.map((p) => (
-                      <div
-                        key={p.period}
-                        style={{
-                          backgroundColor: getPeriodColor(p.period),
-                          padding: "0.5rem",
-                          marginBottom: "0.5rem",
-                          borderRadius: "3px",
-                        }}
-                      >
-                        <strong>Period {p.period}:</strong>{" "}
-                        {p.courseNames.join(", ")}
+                      <div key={p.period}>
+                        <strong>Period {p.period}:</strong> {p.courseNames.join(", ")}
                       </div>
                     ))}
                   </Card.Body>

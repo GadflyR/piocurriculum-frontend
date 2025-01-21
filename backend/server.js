@@ -134,7 +134,7 @@ const rawCourseLevelMap = new Map([
   ["Geometry, Honors", 5],
   ["Algebra II", 5],
   ["Algebra 2, Honors", 5],
-  ["Pre Calculus, CP", 6],
+  ["Precalculus, CP", 6],
   ["Honors Precalculus", 6],
   ["AP Precalculus", 6],
   ["Calculus", 7],
@@ -186,11 +186,11 @@ const rawPrereqMap = new Map([
   ["Geometry, Honors", ["Algebra I"]],
   ["Algebra II", ["Algebra I"]],
   ["Algebra 2, Honors", ["Algebra I"]],
-  ["Pre Calculus, CP", ["Algebra II", "Algebra 2, Honors"]],
+  ["Precalculus, CP", ["Algebra II", "Algebra 2, Honors"]],
   ["Honors Precalculus", ["Algebra II", "Algebra 2, Honors"]],
   ["AP Precalculus", ["Algebra II", "Algebra 2, Honors"]],
-  ["Calculus", ["Pre Calculus, CP", "Honors Precalculus", "AP Precalculus"]],
-  ["AP Calculus AB", ["Pre Calculus, CP", "Honors Precalculus", "AP Precalculus"]],
+  ["Calculus", ["Precalculus, CP", "Honors Precalculus", "AP Precalculus"]],
+  ["AP Calculus AB", ["Precalculus, CP", "Honors Precalculus", "AP Precalculus"]],
   ["AP Calculus BC", ["AP Calculus AB"]],
   ["AP Statistics", ["AP Calculus BC"]],
 
@@ -242,7 +242,7 @@ function getCategoryByName(originalName) {
     lower.includes("algebra ii") ||
     lower.includes("algebra 2") ||
     lower.includes("geometry") ||
-    lower.includes("pre calculus") ||
+    lower.includes("precalculus") ||
     lower.includes("precalculus") ||
     lower.includes("ap precalculus") ||
     lower.includes("honors precalculus") ||
@@ -415,7 +415,7 @@ function initAllCourses() {
   helper("Chemistry, CP", 4.33, 3.5, 4.7, 3, 9, 12, false);
   helper("Web Development I (Fall)/Web Development II", 4.00, 4.6, 5.0, 3, 9, 12, false);
   helper("Sociology of the Future (Fall) / Global Issues (Spring)", 4.00, 3.8, 4.3, 3, 9, 12, false);
-  helper("Pre Calculus, CP", 4.33, 4.0, 4.6, 3, 9, 12, false);
+  helper("Precalculus, CP", 4.33, 4.0, 4.6, 3, 9, 12, false);
   helper("National & International Current Affairs (Fall) / Public Speaking (Spring)", 4.00, 3.7, 3.8, 3, 9, 12, false);
   helper("PE/Health (Fall) / PE/Health (Spring)", 4.00, 2.8, 3.0, 3, 9, 12, false);
   helper("AP English Language & Composition", 5.33, 4.6, 5.0, 3, 11, 12, true);
@@ -450,7 +450,7 @@ function initAllCourses() {
   helper("Physics, CP/Honors", 5.00, 4.5, 4.9, 5, 9, 12, false);
   helper("AP Comparative Government and Politics", 5.33, 5.0, 5.0, 5, 10, 12, true);
   helper("Entrepreneurship / Marketing", 4.00, 4.2, 4.7, 5, 9, 12, false);
-  helper("Pre Calculus, CP", 4.33, 4.1, 4.6, 5, 9, 12, false);
+  helper("Precalculus, CP", 4.33, 4.1, 4.6, 5, 9, 12, false);
   helper("Calculus", 4.00, 4.5, 4.7, 5, 9, 12, false);
   helper("AP Calculus AB", 5.33, 4.9, 5.0, 5, 10, 12, true);
   helper("Principles of Business (Fall)/ Project Management (Spring)", 4.00, 4.3, 4.6, 5, 9, 12, false);

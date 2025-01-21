@@ -1,9 +1,19 @@
 import React, { useState, useEffect } from "react";
-import { Accordion, Form, Row, Col, Button, ProgressBar, Card, Alert } from "react-bootstrap";
+import {
+  Form,
+  Row,
+  Col,
+  Button,
+  ProgressBar,
+  Card,
+  Alert,
+  Table,
+  Accordion,
+} from "react-bootstrap";
 import { generatePlan } from "../services/curriculumService";
 import { ALL_COURSES } from "../utils/courseData";
 
-// Utility function to unify CP/Honors in names, leaving AP courses alone.
+// Utility that unifies CP/Honors in names, leaving "AP" courses alone:
 function unifyNonAPName(name) {
   if (name.includes("AP ")) return name.trim();
   return name
@@ -13,32 +23,88 @@ function unifyNonAPName(name) {
     .trim();
 }
 
-/**
- * This function groups the unified course names by subject, searching
- * for keywords in the course name (e.g. "biology", "history", "spanish", etc.)
- * so that we can classify them under:
- * - English
- * - Math
- * - Science
- * - Social Studies
- * - World Language
- * - Computer/Tech
- * - Business/Financial
- * - Arts/PE/Elective
- * - Other
- */
+// Used to assign background colors to periods in the final schedule.
+// You can pick your own colors or expand the array:
+function getPeriodBgColor(period) {
+  const colors = [
+    "#fdfdfd",  // near white
+    "#f8f9fa",  // extremely light gray
+    "#f1f3f5",
+    "#eceeef",
+    "#e9ecef",
+    "#e2e6ea",
+    "#dee2e6",
+    "#d6d8db",
+  ];
+  // Cycle through the array based on period number
+  return colors[(period - 1) % colors.length] || "#f8f9fa";
+}
+
+// Define a small level-mapping dictionary for each subject’s known courses.
+// Lower level means easier, listed first.
+const SUBJECT_LEVELS = {
+  Math: {
+    "Algebra I": 1,
+    Geometry: 2,
+    "Algebra II": 3,
+    Precalculus: 4,
+    Calculus: 5,
+    "AP Statistics": 6,
+    "AP Precalculus": 7,
+    "AP Calculus AB": 8,
+    "AP Calculus BC": 9,
+    "Honors Probability & Statistics": 10,
+    "SAT Math": 11,
+  },
+  English: {
+    "English 9": 1,
+    "English 10": 2,
+    "English 11": 3,
+    "English 12": 4,
+    "AP English Language & Composition": 5,
+  },
+  Science: {
+    Biology: 1,
+    Chemistry: 2,
+    Physics: 3,
+    "AP Biology": 4,
+    "AP Chemistry": 5,
+    "AP Physics I": 6,
+    "AP Environmental Science": 7,
+    "Biology Honors": 2.5,
+    "Chemistry Honors": 3.5,
+  },
+  SocialStudies: {
+    // Merged "Business/Financial" → "Social Studies"
+    "Financial Literacy": 1,
+    "Intro to Business": 2,
+    Marketing: 3,
+    Economics: 4,
+    "US History": 5,
+    "Modern World History": 6,
+  },
+  // Add more level maps if needed...
+};
+
+// 1) Group all courses by subject, merging "Business/Financial" → "Social Studies".
+//    Also classify "Cultural Studies" and "Current Affairs/Public Speaking" as Social Studies.
 function groupCoursesBySubjectUnified(courses) {
   const subjectMap = {};
 
   for (const originalName of courses) {
-    // unify CP/Honors for display
     const unified = unifyNonAPName(originalName);
     const lower = unified.toLowerCase();
 
-    // Default to "Other," then refine based on keywords
     let subject = "Other";
 
-    if (lower.includes("english")) {
+    // Force Cultural Studies, Current Affairs, & Public Speaking into Social Studies
+    if (
+      lower.includes("cultural studies") ||
+      lower.includes("current affairs") ||
+      lower.includes("public speaking")
+    ) {
+      subject = "Social Studies";
+    } else if (lower.includes("english")) {
       subject = "English";
     } else if (
       lower.includes("algebra") ||
@@ -46,7 +112,6 @@ function groupCoursesBySubjectUnified(courses) {
       lower.includes("calculus") ||
       lower.includes("statistics") ||
       lower.includes("precalculus") ||
-      lower.includes("pre calculus") ||
       lower.includes("sat math")
     ) {
       subject = "Math";
@@ -70,7 +135,13 @@ function groupCoursesBySubjectUnified(courses) {
       lower.includes("world religions") ||
       lower.includes("mythology") ||
       lower.includes("global issues") ||
-      lower.includes("social studies")
+      lower.includes("social studies") ||
+      // Business/Financial → Social Studies
+      lower.includes("financial") ||
+      lower.includes("business") ||
+      lower.includes("entrepreneurship") ||
+      lower.includes("marketing") ||
+      lower.includes("econ")
     ) {
       subject = "Social Studies";
     } else if (
@@ -94,14 +165,6 @@ function groupCoursesBySubjectUnified(courses) {
     ) {
       subject = "Computer/Tech";
     } else if (
-      lower.includes("financial") ||
-      lower.includes("business") ||
-      lower.includes("entrepreneurship") ||
-      lower.includes("marketing") ||
-      lower.includes("econ") // for "economics"
-    ) {
-      subject = "Business/Financial";
-    } else if (
       lower.includes("pe/health") ||
       lower.includes("music") ||
       lower.includes("pencil and ink") ||
@@ -117,31 +180,65 @@ function groupCoursesBySubjectUnified(courses) {
       subject = "Arts/PE/Elective";
     }
 
-    // Create a set for the subject if it doesn't exist
     if (!subjectMap[subject]) {
       subjectMap[subject] = new Set();
     }
-    // Store the unified name (to avoid duplicates)
     subjectMap[subject].add(unified);
   }
 
-  // Convert each set to a sorted array
+  // Convert to arrays for each subject
   const result = {};
   for (const subj in subjectMap) {
-    result[subj] = Array.from(subjectMap[subj]).sort();
+    result[subj] = Array.from(subjectMap[subj]);
   }
   return result;
 }
 
-// We define the subject order for the UI – the headings in the Accordion
+// 2) Sort courses by numeric "level" if we have it, otherwise by name
+function sortByLevel(subject, courses) {
+  const levelMap = SUBJECT_LEVELS[subject.replace(/\s/g, "")] || {};
+  return [...courses].sort((a, b) => {
+    const levA = levelMap[a] ?? 9999;
+    const levB = levelMap[b] ?? 9999;
+    if (levA === levB) return a.localeCompare(b);
+    return levA - levB;
+  });
+}
+
+// 3) For subjects that may have AP or special courses, we split into 3 columns.
+//    For "World Language", "Arts/PE/Elective", and "Other", we just show a single column.
+function splitIntoThreeColumns(subject, courseList) {
+  const col1 = []; // Non-AP
+  const col2 = []; // AP
+  const col3 = []; // Special (Honors, SAT, Probability, etc.)
+
+  courseList.forEach((courseName) => {
+    if (courseName.startsWith("AP ")) {
+      col2.push(courseName);
+    } else if (
+      /honors|sat|probability|statistics/i.test(courseName) &&
+      !courseName.startsWith("AP ")
+    ) {
+      col3.push(courseName);
+    } else {
+      col1.push(courseName);
+    }
+  });
+
+  const sorted1 = sortByLevel(subject, col1);
+  const sorted2 = sortByLevel(subject, col2);
+  const sorted3 = sortByLevel(subject, col3);
+  return { col1: sorted1, col2: sorted2, col3: sorted3 };
+}
+
+// The order in which we display subjects:
 const SUBJECT_ORDER = [
   "English",
   "Math",
   "Science",
   "Social Studies",
-  "World Language",
   "Computer/Tech",
-  "Business/Financial",
+  "World Language",
   "Arts/PE/Elective",
   "Other",
 ];
@@ -149,16 +246,14 @@ const SUBJECT_ORDER = [
 const CurriculumForm = () => {
   const [grade, setGrade] = useState(9);
   const [majorDirection, setMajorDirection] = useState(1);
-  // Here we store "unified" names in completedCourses
   const [completedCourses, setCompletedCourses] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
-
-  // This object maps subjects ("Math", "Science") to arrays of unified course names
+  // Grouped courses by subject
   const [coursesBySubject, setCoursesBySubject] = useState({});
 
-  // On mount, group all your course names (ALL_COURSES) by subject
+  // On mount, group all course names
   useEffect(() => {
     const grouped = groupCoursesBySubjectUnified(ALL_COURSES);
     setCoursesBySubject(grouped);
@@ -173,20 +268,19 @@ const CurriculumForm = () => {
     );
   };
 
-  // Handle form submission to generate the plan
+  // Submit to backend
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
     setResult(null);
     setError(null);
 
-    const payload = {
-      grade: parseInt(grade, 10),
-      completedCourses: completedCourses, // we pass the unified names
-      majorDirectionCode: parseInt(majorDirection, 10),
-    };
-
     try {
+      const payload = {
+        grade: parseInt(grade, 10),
+        completedCourses,
+        majorDirectionCode: parseInt(majorDirection, 10),
+      };
       const data = await generatePlan(payload);
       setResult(data);
     } catch (err) {
@@ -198,10 +292,11 @@ const CurriculumForm = () => {
   };
 
   return (
-    <div className="container mt-4">
-      <h2>Curriculum Planner</h2>
+    // Add padding & light background to the entire container
+    <div className="container p-4" style={{ backgroundColor: "#fdfdfd" }}>
+      <h2 className="mb-4">Curriculum Planner</h2>
 
-      <Form onSubmit={handleSubmit}>
+      <Form onSubmit={handleSubmit} className="mb-4">
         <Row className="mb-3">
           <Col md={4}>
             <Form.Group controlId="gradeSelect">
@@ -237,38 +332,11 @@ const CurriculumForm = () => {
           </Col>
         </Row>
 
-        <div className="mb-3">
-          <p>
-            Please select any courses you've taken in the past. CP/Honors courses
-            are merged into a single label (e.g., "English 9"). AP courses remain
-            labeled as "AP ...".
-          </p>
-        </div>
-
-        <Accordion alwaysOpen className="mb-3">
-          {SUBJECT_ORDER.map((subj, index) => {
-            const coursesInThisSubject = coursesBySubject[subj] || [];
-            if (!coursesInThisSubject.length) return null;
-
-            return (
-              <Accordion.Item eventKey={String(index)} key={subj}>
-                <Accordion.Header>{subj}</Accordion.Header>
-                <Accordion.Body>
-                  {coursesInThisSubject.map((unifiedName) => (
-                    <Form.Check
-                      key={unifiedName}
-                      type="checkbox"
-                      label={unifiedName}
-                      checked={completedCourses.includes(unifiedName)}
-                      onChange={() => handleCourseToggle(unifiedName)}
-                      className="mb-2"
-                    />
-                  ))}
-                </Accordion.Body>
-              </Accordion.Item>
-            );
-          })}
-        </Accordion>
+        <p className="mb-4">
+          Check the boxes for any courses you've already taken. Expand a subject's
+          panel to see Non-AP, AP, and Special (Honors/SAT) columns, or just one
+          column for World Language, Arts/PE/Elective, and Other.
+        </p>
 
         <Button type="submit" variant="primary" disabled={isLoading}>
           Generate Plan
@@ -276,23 +344,138 @@ const CurriculumForm = () => {
       </Form>
 
       {isLoading && (
-        <div className="mt-3">
+        <div className="my-3">
           <ProgressBar animated now={100} label="Generating..." />
         </div>
       )}
 
       {error && (
-        <Alert variant="danger" className="mt-3">
+        <Alert variant="danger" className="my-3">
           {error}
         </Alert>
       )}
 
+      {/* Accordion for each subject so we can expand/collapse */}
+      <Accordion alwaysOpen={false} flush className="mb-5">
+        {SUBJECT_ORDER.map((subj, idx) => {
+          const courseArray = coursesBySubject[subj] || [];
+          if (!courseArray.length) return null;
+
+          return (
+            <Accordion.Item eventKey={`${idx}`} key={subj}>
+              <Accordion.Header>{subj}</Accordion.Header>
+              <Accordion.Body>
+                {subj === "World Language" ||
+                subj === "Arts/PE/Elective" ||
+                subj === "Other" ? (
+                  // Single column
+                  (() => {
+                    const sortedSingleColumn = sortByLevel(subj, courseArray);
+                    return (
+                      <Table bordered hover responsive className="mb-3">
+                        <thead>
+                          <tr>
+                            <th>Courses</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {sortedSingleColumn.map((courseName, idx2) => (
+                            <tr key={idx2}>
+                              <td>
+                                <Form.Check
+                                  type="checkbox"
+                                  label={courseName}
+                                  checked={completedCourses.includes(courseName)}
+                                  onChange={() =>
+                                    handleCourseToggle(courseName)
+                                  }
+                                />
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </Table>
+                    );
+                  })()
+                ) : (
+                  // Three columns
+                  (() => {
+                    const { col1, col2, col3 } = splitIntoThreeColumns(
+                      subj,
+                      courseArray
+                    );
+                    const rowCount = Math.max(
+                      col1.length,
+                      col2.length,
+                      col3.length
+                    );
+                    return (
+                      <Table bordered hover responsive className="mb-3">
+                        <thead>
+                          <tr>
+                            <th>Non-AP</th>
+                            <th>AP</th>
+                            <th>Special</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {Array.from({ length: rowCount }).map((_, rowIndex) => {
+                            const c1 = col1[rowIndex] || null;
+                            const c2 = col2[rowIndex] || null;
+                            const c3 = col3[rowIndex] || null;
+                            return (
+                              <tr key={rowIndex}>
+                                <td>
+                                  {c1 && (
+                                    <Form.Check
+                                      type="checkbox"
+                                      label={c1}
+                                      checked={completedCourses.includes(c1)}
+                                      onChange={() => handleCourseToggle(c1)}
+                                    />
+                                  )}
+                                </td>
+                                <td>
+                                  {c2 && (
+                                    <Form.Check
+                                      type="checkbox"
+                                      label={c2}
+                                      checked={completedCourses.includes(c2)}
+                                      onChange={() => handleCourseToggle(c2)}
+                                    />
+                                  )}
+                                </td>
+                                <td>
+                                  {c3 && (
+                                    <Form.Check
+                                      type="checkbox"
+                                      label={c3}
+                                      checked={completedCourses.includes(c3)}
+                                      onChange={() => handleCourseToggle(c3)}
+                                    />
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </Table>
+                    );
+                  })()
+                )}
+              </Accordion.Body>
+            </Accordion.Item>
+          );
+        })}
+      </Accordion>
+
+      {/* Display the results after generation */}
       {result && !isLoading && (
         <div className="mt-5">
-          <h3>Results</h3>
+          <h3 className="mb-4">Results</h3>
 
           {/* Highest GPA Plans */}
-          <div className="mb-4">
+          <div className="mb-5">
             <h4>Highest GPA Plans</h4>
             {result.highestGpaPlans?.length ? (
               result.highestGpaPlans.map((plan, idx) => (
@@ -302,7 +485,11 @@ const CurriculumForm = () => {
                   </Card.Header>
                   <Card.Body>
                     {plan.periods.map((p) => (
-                      <div key={p.period} className="mb-2">
+                      <div
+                        key={p.period}
+                        className="mb-3 p-3 rounded"
+                        style={{ backgroundColor: getPeriodBgColor(p.period) }}
+                      >
                         <strong>Period {p.period}:</strong> {p.courseNames.join(", ")}
                       </div>
                     ))}
@@ -315,14 +502,18 @@ const CurriculumForm = () => {
           </div>
 
           {/* Most Relevant Plan */}
-          <div className="mb-4">
+          <div className="mb-5">
             <h4>Most Relevant Plan</h4>
             {result.mostRelevantPlan?.length ? (
               <Card className="mb-3">
                 <Card.Header>Most Relevant</Card.Header>
                 <Card.Body>
                   {result.mostRelevantPlan.map((p, idx) => (
-                    <div key={idx} className="mb-2">
+                    <div
+                      key={idx}
+                      className="mb-3 p-3 rounded"
+                      style={{ backgroundColor: getPeriodBgColor(p.period) }}
+                    >
                       <strong>Period {p.period}:</strong> {p.courseNames.join(", ")}
                     </div>
                   ))}
@@ -334,7 +525,7 @@ const CurriculumForm = () => {
           </div>
 
           {/* Easiest Plans */}
-          <div className="mb-4">
+          <div className="mb-5">
             <h4>Easiest Plans</h4>
             {result.easiestPlans?.length ? (
               result.easiestPlans.map((plan, idx) => (
@@ -344,7 +535,11 @@ const CurriculumForm = () => {
                   </Card.Header>
                   <Card.Body>
                     {plan.periods.map((p) => (
-                      <div key={p.period} className="mb-2">
+                      <div
+                        key={p.period}
+                        className="mb-3 p-3 rounded"
+                        style={{ backgroundColor: getPeriodBgColor(p.period) }}
+                      >
                         <strong>Period {p.period}:</strong> {p.courseNames.join(", ")}
                       </div>
                     ))}

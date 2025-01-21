@@ -175,7 +175,6 @@ const rawCourseLevelMap = new Map([
   ["AP US Government and Politics", 5],
   ["AP European History", 5],
   ["AP Environmental Science", 4],
-  ["AP Precalculus", 6],
   ["Honors Probability & Statistics", 5],
 ]);
 
@@ -242,7 +241,6 @@ function getCategoryByName(originalName) {
     lower.includes("algebra ii") ||
     lower.includes("algebra 2") ||
     lower.includes("geometry") ||
-    lower.includes("precalculus") ||
     lower.includes("precalculus") ||
     lower.includes("ap precalculus") ||
     lower.includes("honors precalculus") ||

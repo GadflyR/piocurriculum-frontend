@@ -15,12 +15,24 @@ import { ALL_COURSES } from "../utils/courseData";
 
 // Utility that unifies CP/Honors in names, leaving "AP" courses alone:
 function unifyNonAPName(name) {
-  if (name.includes("AP ")) return name.trim();
-  return name
-    .replace("CP/Honors", "")
-    .replace(", CP", "")
-    .replace(", Honors", "")
-    .trim();
+  let n = name.trim();
+
+  // If it starts with “AP ”, return as-is
+  if (n.includes("AP ")) return n;
+
+  // Remove CP/Honors references
+  n = n.replace(/CP\/Honors/gi, "");
+  n = n.replace(/,\s?CP/gi, "");
+  n = n.replace(/,\s?Honors/gi, "");
+
+  // Unite variations of “Pre Calculus” → “Precalculus”
+  n = n.replace(/\bPre\s?Calc(ulus)?\b/gi, "Precalculus");
+
+  // Unite “Honors Probability & Stats” → “Honors Probability & Statistics”
+  // (in case user typed it differently)
+  n = n.replace(/\bHonors Probability & Stats?\b/i, "Honors Probability & Statistics");
+
+  return n.trim();
 }
 
 // Used to assign background colors to periods in the final schedule.
@@ -92,6 +104,7 @@ function groupCoursesBySubjectUnified(courses) {
   const subjectMap = {};
 
   for (const originalName of courses) {
+    // Use the updated unifyNonAPName
     const unified = unifyNonAPName(originalName);
     const lower = unified.toLowerCase();
 
@@ -111,7 +124,7 @@ function groupCoursesBySubjectUnified(courses) {
       lower.includes("geometry") ||
       lower.includes("calculus") ||
       lower.includes("statistics") ||
-      lower.includes("precalculus") ||
+      lower.includes("precalculus") ||    // ensures newly unified "Precalculus" is recognized
       lower.includes("sat math")
     ) {
       subject = "Math";
@@ -186,7 +199,7 @@ function groupCoursesBySubjectUnified(courses) {
     subjectMap[subject].add(unified);
   }
 
-  // Convert to arrays for each subject
+  // Convert each subject's set to an array
   const result = {};
   for (const subj in subjectMap) {
     result[subj] = Array.from(subjectMap[subj]);

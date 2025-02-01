@@ -494,12 +494,6 @@ const CurriculumForm = () => {
               <p>No easiest plan found.</p>
             )}
           </div>
-
-          {/* Debug section: display the raw result JSON */}
-          <div className="mb-5">
-            <h4>Debug Info</h4>
-            <pre>{JSON.stringify(result, null, 2)}</pre>
-          </div>
         </div>
       )}
     </div>

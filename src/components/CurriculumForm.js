@@ -16,31 +16,20 @@ import { ALL_COURSES } from "../utils/courseData";
 // Utility that unifies CP/Honors in names, leaving "AP" courses alone:
 function unifyNonAPName(name) {
   let n = name.trim();
-
-  // If it starts with “AP ”, return as-is
   if (n.includes("AP ")) return n;
-
-  // Remove CP/Honors references
   n = n.replace(/CP\/Honors/gi, "");
   n = n.replace(/,\s?CP/gi, "");
   n = n.replace(/,\s?Honors/gi, "");
-
-  // Unite variations of “Pre Calculus” → “Precalculus”
   n = n.replace(/\bPre\s?Calc(ulus)?\b/gi, "Precalculus");
-
-  // Unite “Honors Probability & Stats” → “Honors Probability & Statistics”
-  // (in case user typed it differently)
   n = n.replace(/\bHonors Probability & Stats?\b/i, "Honors Probability & Statistics");
-
   return n.trim();
 }
 
 // Used to assign background colors to periods in the final schedule.
-// You can pick your own colors or expand the array:
 function getPeriodBgColor(period) {
   const colors = [
-    "#fdfdfd",  // near white
-    "#f8f9fa",  // extremely light gray
+    "#fdfdfd",
+    "#f8f9fa",
     "#f1f3f5",
     "#eceeef",
     "#e9ecef",
@@ -48,12 +37,9 @@ function getPeriodBgColor(period) {
     "#dee2e6",
     "#d6d8db",
   ];
-  // Cycle through the array based on period number
   return colors[(period - 1) % colors.length] || "#f8f9fa";
 }
 
-// Define a small level-mapping dictionary for each subject’s known courses.
-// Lower level means easier, listed first.
 const SUBJECT_LEVELS = {
   Math: {
     "Algebra I": 1,
@@ -87,7 +73,6 @@ const SUBJECT_LEVELS = {
     "Chemistry Honors": 3.5,
   },
   SocialStudies: {
-    // Merged "Business/Financial" → "Social Studies"
     "Financial Literacy": 1,
     "Intro to Business": 2,
     Marketing: 3,
@@ -95,22 +80,14 @@ const SUBJECT_LEVELS = {
     "US History": 5,
     "Modern World History": 6,
   },
-  // Add more level maps if needed...
 };
 
-// 1) Group all courses by subject, merging "Business/Financial" → "Social Studies".
-//    Also classify "Cultural Studies" and "Current Affairs/Public Speaking" as Social Studies.
 function groupCoursesBySubjectUnified(courses) {
   const subjectMap = {};
-
   for (const originalName of courses) {
-    // Use the updated unifyNonAPName
     const unified = unifyNonAPName(originalName);
     const lower = unified.toLowerCase();
-
     let subject = "Other";
-
-    // Force Cultural Studies, Current Affairs, & Public Speaking into Social Studies
     if (
       lower.includes("cultural studies") ||
       lower.includes("current affairs") ||
@@ -124,7 +101,7 @@ function groupCoursesBySubjectUnified(courses) {
       lower.includes("geometry") ||
       lower.includes("calculus") ||
       lower.includes("statistics") ||
-      lower.includes("precalculus") ||    // ensures newly unified "Precalculus" is recognized
+      lower.includes("precalculus") ||
       lower.includes("sat math")
     ) {
       subject = "Math";
@@ -149,7 +126,6 @@ function groupCoursesBySubjectUnified(courses) {
       lower.includes("mythology") ||
       lower.includes("global issues") ||
       lower.includes("social studies") ||
-      // Business/Financial → Social Studies
       lower.includes("financial") ||
       lower.includes("business") ||
       lower.includes("entrepreneurship") ||
@@ -192,14 +168,11 @@ function groupCoursesBySubjectUnified(courses) {
     ) {
       subject = "Arts/PE/Elective";
     }
-
     if (!subjectMap[subject]) {
       subjectMap[subject] = new Set();
     }
     subjectMap[subject].add(unified);
   }
-
-  // Convert each subject's set to an array
   const result = {};
   for (const subj in subjectMap) {
     result[subj] = Array.from(subjectMap[subj]);
@@ -207,44 +180,34 @@ function groupCoursesBySubjectUnified(courses) {
   return result;
 }
 
-// 2) Sort courses by numeric "level" if we have it, otherwise by name
 function sortByLevel(subject, courses) {
   const levelMap = SUBJECT_LEVELS[subject.replace(/\s/g, "")] || {};
   return [...courses].sort((a, b) => {
     const levA = levelMap[a] ?? 9999;
     const levB = levelMap[b] ?? 9999;
-    if (levA === levB) return a.localeCompare(b);
-    return levA - levB;
+    return levA === levB ? a.localeCompare(b) : levA - levB;
   });
 }
 
-// 3) For subjects that may have AP or special courses, we split into 3 columns.
-//    For "World Language", "Arts/PE/Elective", and "Other", we just show a single column.
 function splitIntoThreeColumns(subject, courseList) {
   const col1 = []; // Non-AP
   const col2 = []; // AP
-  const col3 = []; // Special (Honors, SAT, Probability, etc.)
-
+  const col3 = []; // Special (Honors, SAT, etc.)
   courseList.forEach((courseName) => {
     if (courseName.startsWith("AP ")) {
       col2.push(courseName);
-    } else if (
-      /honors|sat|probability|statistics/i.test(courseName) &&
-      !courseName.startsWith("AP ")
-    ) {
+    } else if (/honors|sat|probability|statistics/i.test(courseName) && !courseName.startsWith("AP ")) {
       col3.push(courseName);
     } else {
       col1.push(courseName);
     }
   });
-
   const sorted1 = sortByLevel(subject, col1);
   const sorted2 = sortByLevel(subject, col2);
   const sorted3 = sortByLevel(subject, col3);
   return { col1: sorted1, col2: sorted2, col3: sorted3 };
 }
 
-// The order in which we display subjects:
 const SUBJECT_ORDER = [
   "English",
   "Math",
@@ -263,16 +226,13 @@ const CurriculumForm = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
-  // Grouped courses by subject
   const [coursesBySubject, setCoursesBySubject] = useState({});
 
-  // On mount, group all course names
   useEffect(() => {
     const grouped = groupCoursesBySubjectUnified(ALL_COURSES);
     setCoursesBySubject(grouped);
   }, []);
 
-  // Toggle a course in the completedCourses array
   const handleCourseToggle = (unifiedName) => {
     setCompletedCourses((prev) =>
       prev.includes(unifiedName)
@@ -281,7 +241,6 @@ const CurriculumForm = () => {
     );
   };
 
-  // Submit to backend
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
@@ -305,10 +264,8 @@ const CurriculumForm = () => {
   };
 
   return (
-    // Add padding & light background to the entire container
     <div className="container p-4" style={{ backgroundColor: "#fdfdfd" }}>
       <h2 className="mb-4">Curriculum Planner</h2>
-
       <Form onSubmit={handleSubmit} className="mb-4">
         <Row className="mb-3">
           <Col md={4}>
@@ -344,44 +301,36 @@ const CurriculumForm = () => {
             </Form.Group>
           </Col>
         </Row>
-
         <p className="mb-4">
           Check the boxes for any courses you've already taken. Expand a subject's
-          panel to see Non-AP, AP, and Special (Honors/SAT) columns, or just one
-          column for World Language, Arts/PE/Elective, and Other.
+          panel to see Non-AP, AP, and Special columns, or just one column for World
+          Language, Arts/PE/Elective, and Other.
         </p>
-
         <Button type="submit" variant="primary" disabled={isLoading}>
           Generate Plan
         </Button>
       </Form>
-
       {isLoading && (
         <div className="my-3">
           <ProgressBar animated now={100} label="Generating..." />
         </div>
       )}
-
       {error && (
         <Alert variant="danger" className="my-3">
           {error}
         </Alert>
       )}
-
-      {/* Accordion for each subject so we can expand/collapse */}
       <Accordion alwaysOpen={false} flush className="mb-5">
         {SUBJECT_ORDER.map((subj, idx) => {
           const courseArray = coursesBySubject[subj] || [];
           if (!courseArray.length) return null;
-
           return (
             <Accordion.Item eventKey={`${idx}`} key={subj}>
               <Accordion.Header>{subj}</Accordion.Header>
               <Accordion.Body>
-                {subj === "World Language" ||
-                subj === "Arts/PE/Elective" ||
-                subj === "Other" ? (
-                  // Single column
+                {(subj === "World Language" ||
+                  subj === "Arts/PE/Elective" ||
+                  subj === "Other") ? (
                   (() => {
                     const sortedSingleColumn = sortByLevel(subj, courseArray);
                     return (
@@ -411,17 +360,9 @@ const CurriculumForm = () => {
                     );
                   })()
                 ) : (
-                  // Three columns
                   (() => {
-                    const { col1, col2, col3 } = splitIntoThreeColumns(
-                      subj,
-                      courseArray
-                    );
-                    const rowCount = Math.max(
-                      col1.length,
-                      col2.length,
-                      col3.length
-                    );
+                    const { col1, col2, col3 } = splitIntoThreeColumns(subj, courseArray);
+                    const rowCount = Math.max(col1.length, col2.length, col3.length);
                     return (
                       <Table bordered hover responsive className="mb-3">
                         <thead>
@@ -481,13 +422,9 @@ const CurriculumForm = () => {
           );
         })}
       </Accordion>
-
-      {/* Display the results after generation */}
       {result && !isLoading && (
         <div className="mt-5">
           <h3 className="mb-4">Results</h3>
-
-          {/* Highest GPA Plans */}
           <div className="mb-5">
             <h4>Highest GPA Plans</h4>
             {result.highestGpaPlans?.length ? (
@@ -513,8 +450,6 @@ const CurriculumForm = () => {
               <p>No highest GPA plan found.</p>
             )}
           </div>
-
-          {/* Most Relevant Plan */}
           <div className="mb-5">
             <h4>Most Relevant Plan</h4>
             {result.mostRelevantPlan?.length ? (
@@ -536,8 +471,6 @@ const CurriculumForm = () => {
               <p>No most relevant plan found.</p>
             )}
           </div>
-
-          {/* Easiest Plans */}
           <div className="mb-5">
             <h4>Easiest Plans</h4>
             {result.easiestPlans?.length ? (

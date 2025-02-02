@@ -212,6 +212,12 @@ const rawCourseLevelMap = new Map([
   ["AP Chemistry", 4],
   ["Physics, CP/Honors", 3],
   ["AP Physics I", 4],
+  // English courses
+  ["English 9", 1],
+  ["English 10", 2],
+  ["English 11", 3],
+  ["English 12", 4],
+  ["AP English Language & Composition", 5],
   // Languages and others
   [
     "Spanish I /Arabic I /Turkish I / Chinese I / French I (Independent Study with a Supervisor)",

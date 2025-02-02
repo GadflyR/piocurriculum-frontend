@@ -127,15 +127,15 @@ const PlanGenerator = (() => {
   // 4) FILTERING & PLAN GENERATION HELPERS
   // -------------------------------------------------------------------------
   function arePrerequisitesMet(course, completedUnifiedSet) {
-    if (!course.prerequisites || course.prerequisites.length === 0) return true;
-    if (course.name === "AP Calculus BC") {
-      return course.prerequisites.some((pr) => completedUnifiedSet.has(pr));
+    // If the course has no prerequisite array, it’s automatically allowed.
+    if (!course.prerequisites || course.prerequisites.length === 0) {
+      return true;
     }
-    for (const pr of course.prerequisites) {
-      if (!completedUnifiedSet.has(pr)) return false;
-    }
-    return true;
-  }
+  
+    // Use “some()” so that if the student has ANY one of these prerequisites,
+    // the requirement is met for this course.
+    return course.prerequisites.some((pr) => completedUnifiedSet.has(pr));
+  }  
 
   // In filterCourses we add a two‐pass approach for math courses:
   // 1. Compute the highest math level among completed courses.

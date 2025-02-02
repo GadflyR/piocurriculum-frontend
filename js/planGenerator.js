@@ -4,11 +4,6 @@ const PlanGenerator = (() => {
   // -------------------------------------------------------------------------
   // 1) COURSE OBJECT CREATION
   // -------------------------------------------------------------------------
-  // (Uses external helper functions and maps such as:
-  //   - unifyNonAPName(originalName)
-  //   - getCategoryByName(originalName)
-  //   - rawCourseLevelMap, rawPrereqMap
-  // which are defined in planConstants.js)
   function makeCourse(originalName, gpa, diff, rel, period, minG, maxG, isAP) {
     const unified = unifyNonAPName(originalName);
     const cat = getCategoryByName(originalName);
@@ -34,7 +29,6 @@ const PlanGenerator = (() => {
   // -------------------------------------------------------------------------
   // 2) INITIALIZE ALL COURSES
   // -------------------------------------------------------------------------
-  // Builds ALL courses from the external COURSE_DEFINITIONS array.
   function initAllCourses() {
     const list = [];
     if (typeof COURSE_DEFINITIONS === "undefined") {
@@ -45,7 +39,16 @@ const PlanGenerator = (() => {
     }
     for (const def of COURSE_DEFINITIONS) {
       list.push(
-        makeCourse(def.name, def.gpa, def.diff, def.rel, def.period, def.minG, def.maxG, def.isAP)
+        makeCourse(
+          def.name,
+          def.gpa,
+          def.diff,
+          def.rel,
+          def.period,
+          def.minG,
+          def.maxG,
+          def.isAP
+        )
       );
     }
     return list;
@@ -56,7 +59,6 @@ const PlanGenerator = (() => {
   // -------------------------------------------------------------------------
   // 3) GRADUATION REQUIREMENTS
   // -------------------------------------------------------------------------
-  // (A small class kept here.)
   class GraduationRequirements {
     constructor() {
       this.englishNeeded = 20;
@@ -135,6 +137,10 @@ const PlanGenerator = (() => {
     return true;
   }
 
+  // In filterCourses we add a two‐pass approach for math courses:
+  // 1. Compute the highest math level among completed courses.
+  // 2. Gather candidate math courses; if any candidate has level equal to (highest + 1),
+  //    then later only math courses with level exactly highest+1 will be allowed.
   function filterCourses(allCourses, completedUnifiedSet, grade, req) {
     const res = [];
     const CONFLICT_BASES = new Set(["Biology", "Chemistry", "US History"]);
@@ -145,14 +151,27 @@ const PlanGenerator = (() => {
         userConflictBases.add(base);
       }
     }
+    // Compute highest math level from completed courses (using ALL course objects)
     let highestMathLevel = 0;
-    for (const cName of completedUnifiedSet) {
-      const lvl = rawCourseLevelMap.get(cName) || 0;
-      const cat = getCategoryByName(cName);
-      if (cat === CourseCategory.MATH && lvl > highestMathLevel) {
-        highestMathLevel = lvl;
+    for (const course of ALL) {
+      if (
+        completedUnifiedSet.has(course.unifiedName) &&
+        course.category === CourseCategory.MATH &&
+        course.level > highestMathLevel
+      ) {
+        highestMathLevel = course.level;
       }
     }
+    // Determine if there exists any candidate math course exactly one level higher.
+    const candidateMathCourses = ALL.filter(course =>
+      course.category === CourseCategory.MATH &&
+      !completedUnifiedSet.has(course.unifiedName) &&
+      course.level > highestMathLevel &&
+      arePrerequisitesMet(course, completedUnifiedSet) &&
+      (grade >= course.gradeLevelMin && grade <= course.gradeLevelMax)
+    );
+    const useLeastMathOnly = candidateMathCourses.some(c => c.level === highestMathLevel + 1);
+
     const highestNonMathLevelMap = {};
     function getNonMathCategoryBase(courseName) {
       if (courseName.includes("Biology")) return "Biology";
@@ -177,11 +196,13 @@ const PlanGenerator = (() => {
       }
       return null;
     }
-    for (const cName of completedUnifiedSet) {
-      const nm = getNonMathCategoryBase(unifyNonAPName(cName));
-      if (nm) {
-        const lvl = rawCourseLevelMap.get(cName) || 0;
-        highestNonMathLevelMap[nm] = Math.max(highestNonMathLevelMap[nm] || 0, lvl);
+    for (const course of ALL) {
+      if (
+        completedUnifiedSet.has(course.unifiedName) &&
+        getNonMathCategoryBase(course.unifiedName)
+      ) {
+        const nm = getNonMathCategoryBase(course.unifiedName);
+        highestNonMathLevelMap[nm] = Math.max(highestNonMathLevelMap[nm] || 0, course.level);
       }
     }
     function getRequiredEnglishForGrade(grade, completedUnifiedSet) {
@@ -226,14 +247,20 @@ const PlanGenerator = (() => {
           continue;
         }
       }
-      if (!(course.category === CourseCategory.ENGLISH &&
+      if (
+        !(course.category === CourseCategory.ENGLISH &&
           unifyNonAPName(course.name).toLowerCase() ===
-          unifyNonAPName(requiredEnglish).toLowerCase())) {
+          unifyNonAPName(requiredEnglish).toLowerCase())
+      ) {
         if (grade < course.gradeLevelMin || grade > course.gradeLevelMax) continue;
       }
       if (!arePrerequisitesMet(course, completedUnifiedSet)) continue;
       if (course.category === CourseCategory.MATH) {
+        // Only consider math courses with level greater than the highest completed.
         if (course.level <= highestMathLevel) continue;
+        // And if there is at least one candidate math course exactly one level higher,
+        // then only allow math courses whose level is exactly (highestMathLevel + 1).
+        if (useLeastMathOnly && course.level !== highestMathLevel + 1) continue;
       } else {
         const nm = getNonMathCategoryBase(unifyNonAPName(course.unifiedName));
         if (nm) {
@@ -281,11 +308,35 @@ const PlanGenerator = (() => {
   // -------------------------------------------------------------------------
   // 5) FEASIBILITY & SUMMARY FUNCTIONS
   // -------------------------------------------------------------------------
+  // In isFeasible we also compute the highest completed math level from ALL courses
+  // and—if there exists a candidate math course exactly one level above—reject plans whose math course isn’t that course.
   function isFeasible(plan, grade, completedUnifiedSet) {
-    // For demo: allow a single-course plan.
     if (plan.length === 1) return true;
+    
+    let highestMathLevel = 0;
+    for (const course of ALL) {
+      if (
+        completedUnifiedSet.has(course.unifiedName) &&
+        course.category === CourseCategory.MATH &&
+        course.level > highestMathLevel
+      ) {
+        highestMathLevel = course.level;
+      }
+    }
+    const candidateMathCourses = ALL.filter(course =>
+      course.category === CourseCategory.MATH &&
+      !completedUnifiedSet.has(course.unifiedName) &&
+      course.level > highestMathLevel &&
+      arePrerequisitesMet(course, completedUnifiedSet) &&
+      (grade >= course.gradeLevelMin && grade <= course.gradeLevelMax)
+    );
+    const useLeastMathOnly = candidateMathCourses.some(c => c.level === highestMathLevel + 1);
+    
     const math = plan.filter((c) => c.category === CourseCategory.MATH);
     if (math.length !== 1) return false;
+    if (math[0].level <= highestMathLevel) return false;
+    if (useLeastMathOnly && math[0].level !== highestMathLevel + 1) return false;
+    
     const requiredEnglish = (function (grade, completedUnifiedSet) {
       if (grade === 9) {
         if ([...completedUnifiedSet].some((c) => unifyNonAPName(c).toLowerCase() === "english 9"))

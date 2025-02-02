@@ -13,14 +13,26 @@ const {
   Accordion,
 } = ReactBootstrap;
 
+// --- Modified unifyNonAPName ---
+// This version (used in the UI) now normalizes Algebra II variants.
 function unifyNonAPName(name) {
   let n = name.trim();
+
+  // Special handling for Algebra II variants: normalize both "Algebra II" and "Algebra 2, Honors" to "Algebra II"
+  if (/^algebra\s+(ii|2)/i.test(n)) {
+    return "Algebra II";
+  }
+
+  // If it's an AP course, return it as is.
   if (n.includes("AP ")) return n;
+
+  // Remove extraneous markers.
   n = n.replace(/CP\/Honors/gi, "");
   n = n.replace(/,\s?CP/gi, "");
   n = n.replace(/,\s?Honors/gi, "");
-  n = n.replace(/\bPre\s?Calc(ulus)?\b/gi, "Precalculus");
-  n = n.replace(/\bHonors Probability & Stats?\b/i, "Honors Probability & Statistics");
+
+  // If the course starts with "Honors " and is a precalculus variant, remove "Honors "
+  n = n.replace(/^Honors\s+(Precalc(ulus)?)/i, "$1");
   return n.trim();
 }
 
@@ -41,16 +53,16 @@ function getPeriodBgColor(period) {
 const SUBJECT_LEVELS = {
   Math: {
     "Algebra I": 1,
+    "Algebra II": 2, // now both Algebra II variants use the same level
     Geometry: 2,
-    "Algebra II": 3,
-    Precalculus: 4,
-    Calculus: 5,
-    "AP Statistics": 6,
-    "AP Precalculus": 7,
-    "AP Calculus AB": 8,
-    "AP Calculus BC": 9,
-    "Honors Probability & Statistics": 10,
-    "SAT Math": 11,
+    Precalculus: 3,
+    Calculus: 4,
+    "AP Statistics": 5,
+    "AP Precalculus": 6,
+    "AP Calculus AB": 7,
+    "AP Calculus BC": 8,
+    "Honors Probability & Statistics": 9,
+    "SAT Math": 10,
   },
   English: {
     "English 9": 1,
